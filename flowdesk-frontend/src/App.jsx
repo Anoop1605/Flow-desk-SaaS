@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { LayoutDashboard, LayoutGrid } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import KanbanBoard from './pages/KanbanBoard';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function Sidebar() {
   const linkBase =
@@ -61,8 +62,16 @@ export default function App() {
         <Sidebar />
         <main className="flex-1 overflow-y-auto">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/projects/:id/board" element={<KanbanBoard />} />
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/projects/:id/board" element={
+              <ProtectedRoute>
+                <KanbanBoard />
+              </ProtectedRoute>
+            } />
           </Routes>
         </main>
       </div>

@@ -17,6 +17,7 @@ import { Plus, LayoutGrid } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import TaskCard from '../components/TaskCard';
 import CreateTaskModal from '../components/CreateTaskModal';
+import RoleGuard from '../components/RoleGuard';
 import { MOCK_TASKS } from '../data/mockData';
 
 const COLUMNS = [
