@@ -1,39 +1,14 @@
+import React, { memo } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, User, GripVertical } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { CalendarClock, GripVertical, AlertCircle } from 'lucide-react';
+import { cn } from '../lib/utils';
+import { formatDistanceToNow, isPast } from 'date-fns';
+import { useUIStore } from '../stores/uiStore';
 
-// ── Helper: get initials from a name ──
-function getInitials(name) {
-    return name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
-}
-
-// ── Helper: get relative due-date string ──
-function getRelativeDueDate(dueDateStr) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const due = new Date(dueDateStr);
-    due.setHours(0, 0, 0, 0);
-    const diffDays = Math.round((due - today) / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return { text: `Overdue by ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''}`, isOverdue: true };
-    if (diffDays === 0) return { text: 'Due today', isOverdue: false };
-    if (diffDays === 1) return { text: 'Due tomorrow', isOverdue: false };
-    return { text: `${diffDays} days left`, isOverdue: false };
-}
-
-// ── Priority badge config ──
-const PRIORITY_CONFIG = {
-    HIGH: { label: 'High', bg: 'bg-red-500/15', text: 'text-red-400', border: 'border-red-500/30' },
-    MEDIUM: { label: 'Med', bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' },
-    LOW: { label: 'Low', bg: 'bg-slate-500/15', text: 'text-slate-400', border: 'border-slate-500/30' },
-};
-
-export default function TaskCard({ task }) {
+function TaskCardComponent({ task, overlay = false }) {
+    const openTask = useUIStore(s => s.openTask);
     const {
         attributes,
         listeners,
@@ -41,77 +16,82 @@ export default function TaskCard({ task }) {
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: task.id });
+    } = useSortable({
+        id: task.id,
+        data: {
+            type: 'Task',
+            task,
+        },
+    });
 
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
     };
 
-    const priorityCfg = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.MEDIUM;
-    const dueInfo = task.dueDate ? getRelativeDueDate(task.dueDate) : null;
+    const isHigh = task.priority === 'HIGH';
+    const isMedium = task.priority === 'MEDIUM';
+    const isOverdue = task.dueDate && isPast(new Date(task.dueDate)) && task.status !== 'DONE';
 
     return (
         <div
             ref={setNodeRef}
             style={style}
-            className={`
-        group relative rounded-xl border border-slate-700/60 bg-slate-800/80
-        backdrop-blur-sm p-4 cursor-grab active:cursor-grabbing
-        transition-all duration-200 ease-out
-        hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/5
-        ${isDragging ? 'opacity-50 shadow-2xl shadow-indigo-500/20 scale-[1.02] z-50 rotate-1' : ''}
-      `}
+            className={cn(
+                "group relative bg-surface-primary/60 hover:bg-surface-primary backdrop-blur-md rounded-xl border border-white/[0.06] p-4 transition-colors cursor-grab active:cursor-grabbing",
+                isDragging ? "opacity-30" : "opacity-100",
+                overlay ? "shadow-glow-md rotate-2 scale-105 border-indigo-500/30 bg-surface-primary" : "shadow-sm"
+            )}
+            {...attributes}
+            {...listeners}
         >
-            {/* ── Drag Handle ── */}
-            <div
-                {...attributes}
-                {...listeners}
-                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-slate-500 hover:text-slate-300 cursor-grab"
-            >
-                <GripVertical size={16} />
+            <div className="absolute inset-0 z-0" onClick={() => !isDragging && openTask(task.id)} />
+            <div className="relative z-10 flex items-start justify-between gap-3 mb-3">
+                <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className={cn(
+                            "px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md border",
+                            isHigh ? "bg-rose-500/10 text-rose-400 border-rose-500/20" :
+                                isMedium ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                                    "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                        )}>
+                            {task.priority}
+                        </span>
+                        {isOverdue && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
+                                <AlertCircle size={10} /> Overdue
+                            </span>
+                        )}
+                    </div>
+                    <h4 className="text-sm font-medium text-slate-200 leading-snug line-clamp-2 group-hover:text-indigo-300 transition-colors">
+                        {task.title}
+                    </h4>
+                </div>
+                <button className="text-slate-600 hover:text-slate-300 transition-colors opacity-0 group-hover:opacity-100 p-1">
+                    <GripVertical size={16} />
+                </button>
             </div>
 
-            {/* ── Priority Badge ── */}
-            <span
-                className={`
-          inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold
-          border ${priorityCfg.bg} ${priorityCfg.text} ${priorityCfg.border}
-          mb-3
-        `}
-            >
-                {priorityCfg.label}
-            </span>
+            <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <CalendarClock size={14} className={isOverdue ? "text-rose-400" : ""} />
+                    <span className={isOverdue ? "text-rose-400 font-medium" : ""}>
+                        {task.dueDate ? formatDistanceToNow(new Date(task.dueDate), { addSuffix: true }) : 'No due date'}
+                    </span>
+                </div>
 
-            {/* ── Title (2-line truncation) ── */}
-            <h4 className="text-sm font-medium text-slate-100 leading-snug line-clamp-2 mb-3 pr-6">
-                {task.title}
-            </h4>
-
-            {/* ── Footer: Assignee + Due Date ── */}
-            <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-700/40">
-                {/* Assignee */}
                 {task.assignee && (
-                    <div className="relative group/avatar">
-                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-slate-800">
-                            {getInitials(task.assignee.name)}
-                        </div>
-                        {/* Tooltip */}
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-xs text-slate-200 rounded-md whitespace-nowrap opacity-0 group-hover/avatar:opacity-100 transition-opacity duration-200 pointer-events-none shadow-lg border border-slate-700 z-10">
-                            {task.assignee.name}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900" />
-                        </div>
-                    </div>
-                )}
-
-                {/* Due Date */}
-                {dueInfo && (
-                    <div className={`flex items-center gap-1 text-xs ${dueInfo.isOverdue ? 'text-red-400 font-medium' : 'text-slate-400'}`}>
-                        <Calendar size={12} />
-                        <span>{dueInfo.text}</span>
+                    <div
+                        className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-2 ring-surface-primary"
+                        title={task.assignee.name}
+                    >
+                        {task.assignee.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                     </div>
                 )}
             </div>
         </div>
     );
 }
+
+// React.memo prevents unnecessary re-renders during drag
+export const TaskCard = memo(TaskCardComponent);

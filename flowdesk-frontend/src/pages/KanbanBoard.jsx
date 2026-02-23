@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
     DragOverlay,
@@ -7,57 +8,73 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
+    defaultDropAnimationSideEffects,
 } from '@dnd-kit/core';
 import {
     SortableContext,
     verticalListSortingStrategy,
-    arrayMove,
 } from '@dnd-kit/sortable';
-import { Plus, LayoutGrid } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
-import TaskCard from '../components/TaskCard';
+import { Plus, LayoutGrid, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
+
+import { TaskCard } from '../components/TaskCard';
 import CreateTaskModal from '../components/CreateTaskModal';
 import RoleGuard from '../components/RoleGuard';
-import { MOCK_TASKS } from '../data/mockData';
+import { api, queryKeys } from '../lib/api';
+import { cn } from '../lib/utils';
+import { fadeUp } from '../lib/animations';
 
 const COLUMNS = [
-    { id: 'TODO', title: 'To Do', color: 'from-blue-500 to-blue-600', dotColor: 'bg-blue-400' },
-    { id: 'IN_PROGRESS', title: 'In Progress', color: 'from-amber-500 to-amber-600', dotColor: 'bg-amber-400' },
-    { id: 'DONE', title: 'Done', color: 'from-emerald-500 to-emerald-600', dotColor: 'bg-emerald-400' },
+    { id: 'TODO', title: 'To Do', borderClass: 'border-blue-500/30', headerClass: 'bg-blue-500/10 text-blue-400' },
+    { id: 'IN_PROGRESS', title: 'In Progress', borderClass: 'border-amber-500/30', headerClass: 'bg-amber-500/10 text-amber-400' },
+    { id: 'DONE', title: 'Done', borderClass: 'border-emerald-500/30', headerClass: 'bg-emerald-500/10 text-emerald-400' },
 ];
 
-// ── Sort tasks: HIGH > MEDIUM > LOW, then by createdAt ──
-const PRIORITY_ORDER = { HIGH: 0, MEDIUM: 1, LOW: 2 };
-
-function sortTasks(tasks) {
-    return [...tasks].sort((a, b) => {
-        const priorityDiff = (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2);
-        if (priorityDiff !== 0) return priorityDiff;
-        return new Date(a.createdAt) - new Date(b.createdAt);
-    });
-}
-
 export default function KanbanBoard() {
-    const [tasks, setTasks] = useState(MOCK_TASKS);
-    const [activeId, setActiveId] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const projectId = 1; // Hardcoded for Phase 1
+    const queryClient = useQueryClient();
+
+    const [activeTask, setActiveTask] = useState(null);
     const [modalOpen, setModalOpen] = useState(false);
     const [modalDefaultStatus, setModalDefaultStatus] = useState('TODO');
 
-    // Simulate loading
-    useState(() => {
-        const timer = setTimeout(() => setIsLoading(false), 800);
-        return () => clearTimeout(timer);
+    // ── Fetch tasks from Spring Boot Backend ──
+    const { data: responseData, isLoading, isError } = useQuery({
+        queryKey: queryKeys.tasks(projectId),
+        queryFn: async () => {
+            const res = await api.get(`/api/tasks?projectId=${projectId}`);
+            return res.data;
+        }
     });
+
+    // ── Flatten tasks for local state (Optimistic Updates) ──
+    // Because the API returns { tasks: { TODO: [...], IN_PROGRESS: [...] } }
+    // we flatten it to a single array for easier DnD tracking.
+    const [localTasks, setLocalTasks] = useState([]);
+
+    // Sync local state when API data changes
+    useMemo(() => {
+        if (responseData?.tasks) {
+            const all = [
+                ...(responseData.tasks.TODO || []),
+                ...(responseData.tasks.IN_PROGRESS || []),
+                ...(responseData.tasks.DONE || [])
+            ];
+            setLocalTasks(all);
+        }
+    }, [responseData]);
 
     // ── Group tasks by column ──
     const columns = useMemo(() => {
-        const grouped = {};
-        COLUMNS.forEach((col) => {
-            grouped[col.id] = sortTasks(tasks.filter((t) => t.status === col.id));
+        const grouped = { TODO: [], IN_PROGRESS: [], DONE: [] };
+        localTasks.forEach(t => {
+            if (grouped[t.status]) {
+                grouped[t.status].push(t);
+            }
         });
         return grouped;
-    }, [tasks]);
+    }, [localTasks]);
 
     // ── DnD Sensors ──
     const sensors = useSensors(
@@ -65,198 +82,156 @@ export default function KanbanBoard() {
         useSensor(KeyboardSensor)
     );
 
-    // ── Find which column a task lives in ──
-    const findColumn = useCallback(
-        (id) => {
-            for (const [status, items] of Object.entries(columns)) {
-                if (items.some((t) => t.id === id)) return status;
-            }
-            // Check if id is a column id itself
-            if (COLUMNS.some((c) => c.id === id)) return id;
-            return null;
-        },
-        [columns]
-    );
+    const findColumn = useCallback((id) => {
+        const task = localTasks.find(t => t.id === id);
+        if (task) return task.status;
+        if (['TODO', 'IN_PROGRESS', 'DONE'].includes(id)) return id;
+        return null;
+    }, [localTasks]);
 
     // ── Drag Handlers ──
-    function handleDragStart(event) {
-        setActiveId(event.active.id);
-    }
+    const handleDragStart = useCallback((event) => {
+        const task = localTasks.find(t => t.id === event.active.id);
+        setActiveTask(task);
+    }, [localTasks]);
 
-    function handleDragOver(event) {
+    const handleDragOver = useCallback((event) => {
         const { active, over } = event;
         if (!over) return;
 
-        const activeCol = findColumn(active.id);
-        let overCol = findColumn(over.id);
+        const activeId = active.id;
+        const overId = over.id;
 
-        // If we're dragging over a column header (over.id is a column id)
-        if (COLUMNS.some((c) => c.id === over.id)) {
-            overCol = over.id;
-        }
+        const activeCol = findColumn(activeId);
+        const overCol = findColumn(overId);
 
         if (!activeCol || !overCol || activeCol === overCol) return;
 
-        setTasks((prev) =>
-            prev.map((t) => (t.id === active.id ? { ...t, status: overCol } : t))
+        setLocalTasks(prev =>
+            prev.map(t => t.id === activeId ? { ...t, status: overCol } : t)
+        );
+    }, [findColumn]);
+
+    const handleDragEnd = useCallback((event) => {
+        const { active, over } = event;
+        setActiveTask(null);
+        if (!over) return;
+
+        const activeId = active.id;
+        const overId = over.id;
+
+        const activeCol = findColumn(activeId);
+        const overCol = findColumn(overId);
+
+        if (activeCol && overCol && activeCol !== overCol) {
+            setLocalTasks(prev =>
+                prev.map(t => t.id === activeId ? { ...t, status: overCol } : t)
+            );
+            const task = localTasks.find(t => t.id === activeId);
+            // STUB: For Phase 2, this will fire PATCH /api/tasks/{id}/status
+            toast.success(`Moved to ${COLUMNS.find(c => c.id === overCol)?.title}`, {
+                description: task.title
+            });
+        }
+    }, [findColumn, localTasks]);
+
+    const dropAnimation = {
+        sideEffects: defaultDropAnimationSideEffects({
+            styles: { active: { opacity: '0.5' } },
+        }),
+    };
+
+    if (isLoading) {
+        return (
+            <div className="p-6 md:p-8 space-y-8">
+                <div className="skeleton h-10 w-64 rounded-xl" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="skeleton h-[500px] rounded-2xl border border-white/5" />
+                    ))}
+                </div>
+            </div>
         );
     }
 
-    function handleDragEnd(event) {
-        const { active, over } = event;
-        setActiveId(null);
-
-        if (!over) return;
-
-        const activeCol = findColumn(active.id);
-        let overCol = findColumn(over.id);
-
-        if (COLUMNS.some((c) => c.id === over.id)) {
-            overCol = over.id;
-        }
-
-        if (activeCol && overCol && activeCol !== overCol) {
-            setTasks((prev) =>
-                prev.map((t) => (t.id === active.id ? { ...t, status: overCol } : t))
-            );
-            const task = tasks.find((t) => t.id === active.id);
-            const colName = COLUMNS.find((c) => c.id === overCol)?.title;
-            toast.success(`"${task?.title}" moved to ${colName}`);
-        }
-    }
-
-    // ── Add Task ──
-    function handleAddTask(newTask) {
-        setTasks((prev) => [...prev, newTask]);
-        toast.success(`Task "${newTask.title}" created!`);
-    }
-
-    function openModal(status) {
-        setModalDefaultStatus(status);
-        setModalOpen(true);
-    }
-
-    const activeTask = tasks.find((t) => t.id === activeId);
-
-    // ── Skeleton Loader ──
-    if (isLoading) {
+    if (isError) {
         return (
-            <div className="min-h-screen p-6 md:p-8">
-                <div className="max-w-7xl mx-auto">
-                    <div className="skeleton h-8 w-48 mb-8" />
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {[1, 2, 3].map((i) => (
-                            <div key={i} className="space-y-4">
-                                <div className="skeleton h-12 w-full rounded-xl" />
-                                {[1, 2, 3].map((j) => (
-                                    <div key={j} className="skeleton h-28 w-full rounded-xl" />
-                                ))}
-                            </div>
-                        ))}
-                    </div>
-                </div>
+            <div className="h-[400px] flex flex-col items-center justify-center">
+                <p className="text-rose-400 mb-4">Failed to load tasks from backend.</p>
+                <button onClick={() => queryClient.invalidateQueries(queryKeys.tasks(projectId))} className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">
+                    Try Again
+                </button>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen p-6 md:p-8 fade-in">
-            <Toaster
-                position="top-right"
-                toastOptions={{
-                    style: { background: '#1e293b', color: '#f1f5f9', border: '1px solid #334155' },
-                    success: { iconTheme: { primary: '#22c55e', secondary: '#1e293b' } },
-                    error: { iconTheme: { primary: '#ef4444', secondary: '#1e293b' } },
-                }}
-            />
-
-            <div className="max-w-7xl mx-auto">
-                {/* ── Header ── */}
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
-                            <LayoutGrid size={22} className="text-indigo-400" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-100">Kanban Board</h1>
-                            <p className="text-sm text-slate-400">Website Redesign</p>
-                        </div>
+        <div className="max-w-[1600px] mx-auto">
+            <motion.div variants={fadeUp} initial="hidden" animate="visible" className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 border border-indigo-500/30 flex items-center justify-center">
+                        <LayoutGrid size={24} className="text-indigo-400" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-display font-bold text-white tracking-tight">{responseData?.projectName || 'Project Board'}</h1>
+                        <p className="text-sm text-slate-400 mt-1">Manage and track your tasks</p>
                     </div>
                 </div>
+            </motion.div>
 
-                {/* ── Kanban Columns ── */}
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCorners}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDragEnd={handleDragEnd}
-                >
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {COLUMNS.map((col) => {
-                            const colTasks = columns[col.id] || [];
-                            return (
-                                <div
-                                    key={col.id}
-                                    className="flex flex-col rounded-2xl bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm min-h-[400px]"
-                                >
-                                    {/* Column Header */}
-                                    <div className="px-4 py-3.5 border-b border-slate-700/50">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className={`w-2.5 h-2.5 rounded-full ${col.dotColor}`} />
-                                                <h3 className="text-sm font-semibold text-slate-200">{col.title}</h3>
-                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-700/80 text-xs font-bold text-slate-300">
-                                                    {colTasks.length}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Tasks */}
-                                    <SortableContext
-                                        items={colTasks.map((t) => t.id)}
-                                        strategy={verticalListSortingStrategy}
-                                        id={col.id}
-                                    >
-                                        <div className="flex-1 p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-280px)]">
-                                            {colTasks.map((task) => (
-                                                <TaskCard key={task.id} task={task} />
-                                            ))}
-                                        </div>
-                                    </SortableContext>
-
-                                    {/* Add Task Button */}
-                                    <div className="px-3 pb-3">
-                                        <button
-                                            onClick={() => openModal(col.id)}
-                                            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-slate-600 text-sm text-slate-400 hover:text-indigo-400 hover:border-indigo-500/40 hover:bg-indigo-500/5 transition-all"
-                                        >
-                                            <Plus size={16} />
-                                            Add Task
-                                        </button>
-                                    </div>
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+            >
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                    {COLUMNS.map((col) => {
+                        const colTasks = columns[col.id];
+                        return (
+                            <div key={col.id} className="flex flex-col rounded-2xl bg-surface-primary/40 border border-white/[0.04] backdrop-blur-xl">
+                                <div className={cn("px-4 py-3 border-b border-white/[0.04] flex items-center justify-between", col.headerClass, "rounded-t-2xl bg-opacity-50")}>
+                                    <h3 className="text-sm font-semibold tracking-wide uppercase">{col.title}</h3>
+                                    <span className="w-6 h-6 rounded-full bg-black/20 flex items-center justify-center text-xs font-bold text-white">
+                                        {colTasks.length}
+                                    </span>
                                 </div>
-                            );
-                        })}
-                    </div>
 
-                    {/* Drag Overlay */}
-                    <DragOverlay>
-                        {activeTask ? (
-                            <div className="opacity-90 rotate-2 scale-105">
-                                <TaskCard task={activeTask} />
+                                <SortableContext items={colTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                    <div className="flex-1 p-3 min-h-[500px] flex flex-col gap-3">
+                                        {colTasks.map((task) => (
+                                            <TaskCard key={task.id} task={task} />
+                                        ))}
+
+                                        <RoleGuard allowedRoles={['ADMIN', 'MANAGER', 'DEVELOPER']}>
+                                            <button
+                                                onClick={() => {
+                                                    setModalDefaultStatus(col.id);
+                                                    setModalOpen(true);
+                                                }}
+                                                className="mt-2 w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-white/10 text-sm font-medium text-slate-400 hover:text-indigo-300 hover:border-indigo-500/30 hover:bg-indigo-500/10 transition-all group"
+                                            >
+                                                <Plus size={16} className="group-hover:scale-110 transition-transform" /> Add Task
+                                            </button>
+                                        </RoleGuard>
+                                    </div>
+                                </SortableContext>
                             </div>
-                        ) : null}
-                    </DragOverlay>
-                </DndContext>
-            </div>
+                        );
+                    })}
+                </div>
 
-            {/* Create Task Modal */}
+                <DragOverlay dropAnimation={dropAnimation}>
+                    {activeTask ? <TaskCard task={activeTask} overlay /> : null}
+                </DragOverlay>
+            </DndContext>
+
+            {/* Create Task Modal - We will refactor this to Radix Dialog next */}
             <CreateTaskModal
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
-                onSubmit={handleAddTask}
+                onSubmit={(t) => setLocalTasks(p => [...p, { id: Date.now(), ...t }])}
                 defaultStatus={modalDefaultStatus}
             />
         </div>

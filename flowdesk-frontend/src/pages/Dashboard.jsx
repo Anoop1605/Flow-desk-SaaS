@@ -1,296 +1,193 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import {
     LayoutDashboard,
-    FolderKanban,
-    CheckSquare,
-    AlertTriangle,
+    CheckCircle2,
+    AlertCircle,
     Users,
-    Activity,
-    Clock,
-    FileText,
-    MessageSquare,
-    UserPlus,
-    RefreshCw,
+    RefreshCcw,
+    Activity
 } from 'lucide-react';
-import { MOCK_DASHBOARD } from '../data/mockData';
+import { api, queryKeys } from '../lib/api';
+import { fadeUp, staggerContainer } from '../lib/animations';
+import { cn } from '../lib/utils';
+import { formatDistanceToNow } from 'date-fns';
 
-// ── Activity icon mapping ──
-const ACTIVITY_ICONS = {
-    TASK_CREATED: { icon: FileText, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-    STATUS_CHANGED: { icon: Activity, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-    COMMENT_ADDED: { icon: MessageSquare, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    TASK_ASSIGNED: { icon: UserPlus, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+// STUB: Simulate an API call to /api/dashboard for Phase 1
+const fetchDashboardStats = async () => {
+    // In Phase 2: const res = await api.get('/api/dashboard'); return res.data;
+    return new Promise((resolve) => setTimeout(() => resolve({
+        totalProjects: 12,
+        totalTasks: 48,
+        tasksByStatus: { TODO: 15, IN_PROGRESS: 20, DONE: 13 },
+        overdueTasks: 5,
+        teamSize: 8,
+        recentActivity: [
+            { id: 1, type: 'status_change', taskTitle: 'Implement user auth', actorName: 'Alice Johnson', timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString() },
+            { id: 2, type: 'comment', taskTitle: 'Design system review', actorName: 'Bob Smith', timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString() },
+            { id: 3, type: 'create', taskTitle: 'Setup CI/CD', actorName: 'Diana Lee', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString() },
+        ]
+    }), 800));
 };
 
-// ── Format timestamp ──
-function formatTimestamp(ts) {
-    const date = new Date(ts);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+function StatCard({ title, value, icon: Icon, colorClass, gradientClass, delay = 0 }) {
+    return (
+        <motion.div
+            variants={fadeUp}
+            className="relative group overflow-hidden rounded-2xl bg-surface-primary/50 border border-white/[0.08] p-6 hover:bg-surface-primary transition-colors"
+        >
+            <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br", gradientClass)} />
+            <div className="relative flex items-center justify-between">
+                <div>
+                    <p className="text-sm font-medium text-slate-400 mb-1">{title}</p>
+                    <p className="text-3xl font-display font-bold text-white">{value}</p>
+                </div>
+                <div className={cn("p-3 rounded-xl border", colorClass)}>
+                    <Icon size={24} />
+                </div>
+            </div>
+        </motion.div>
+    );
 }
 
 export default function Dashboard() {
-    const [data, setData] = useState(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(false);
+    const { data, isLoading, isError, refetch } = useQuery({
+        queryKey: queryKeys.dashboard,
+        queryFn: fetchDashboardStats,
+    });
 
-    function fetchDashboard() {
-        setIsLoading(true);
-        setError(false);
-        // Simulate API delay
-        setTimeout(() => {
-            setData(MOCK_DASHBOARD);
-            setIsLoading(false);
-        }, 600);
-    }
-
-    useEffect(() => {
-        fetchDashboard();
-    }, []);
-
-    // ── Stat Cards config ──
-    const statCards = data
-        ? [
-            {
-                label: 'Total Projects',
-                value: data.totalProjects,
-                icon: FolderKanban,
-                gradient: 'from-indigo-500 to-indigo-600',
-                iconBg: 'bg-indigo-500/15',
-                iconColor: 'text-indigo-400',
-            },
-            {
-                label: 'Open Tasks',
-                value: data.tasksByStatus.TODO + data.tasksByStatus.IN_PROGRESS,
-                icon: CheckSquare,
-                gradient: 'from-blue-500 to-blue-600',
-                iconBg: 'bg-blue-500/15',
-                iconColor: 'text-blue-400',
-            },
-            {
-                label: 'Overdue Tasks',
-                value: data.overdueTasks,
-                icon: AlertTriangle,
-                gradient: 'from-red-500 to-red-600',
-                iconBg: 'bg-red-500/15',
-                iconColor: 'text-red-400',
-            },
-            {
-                label: 'Team Size',
-                value: data.teamSize,
-                icon: Users,
-                gradient: 'from-emerald-500 to-emerald-600',
-                iconBg: 'bg-emerald-500/15',
-                iconColor: 'text-emerald-400',
-            },
-        ]
-        : [];
-
-    // ── Skeleton ──
     if (isLoading) {
         return (
-            <div className="min-h-screen p-6 md:p-8">
-                <div className="max-w-7xl mx-auto">
-                    <div className="skeleton h-8 w-48 mb-8" />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-                        {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="skeleton h-28 rounded-xl" />
-                        ))}
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="skeleton h-80 rounded-xl" />
-                        <div className="skeleton h-80 rounded-xl" />
-                    </div>
+            <div className="space-y-8">
+                <div className="skeleton h-10 w-48 rounded-lg" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[1, 2, 3, 4].map(i => <div key={i} className="skeleton h-32 rounded-2xl" />)}
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="skeleton h-96 rounded-2xl lg:col-span-2" />
+                    <div className="skeleton h-96 rounded-2xl" />
                 </div>
             </div>
         );
     }
 
-    // ── Error State ──
-    if (error) {
+    if (isError) {
         return (
-            <div className="min-h-screen flex items-center justify-center p-6">
-                <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
-                        <AlertTriangle size={28} className="text-red-400" />
-                    </div>
-                    <h2 className="text-lg font-semibold text-slate-200 mb-2">Failed to load dashboard</h2>
-                    <p className="text-sm text-slate-400 mb-6">Something went wrong. Please try again.</p>
-                    <button
-                        onClick={fetchDashboard}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm font-medium text-white transition-colors shadow-lg shadow-indigo-500/20"
-                    >
-                        <RefreshCw size={16} />
-                        Retry
-                    </button>
+            <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+                <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500 mb-4">
+                    <AlertCircle size={32} />
                 </div>
+                <h2 className="text-xl font-semibold text-white mb-2">Failed to load dashboard</h2>
+                <p className="text-slate-400 mb-6 max-w-md">There was a problem connecting to the server. Please check your connection and try again.</p>
+                <button
+                    onClick={() => refetch()}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium transition-colors"
+                >
+                    <RefreshCcw size={16} /> Try Again
+                </button>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen p-6 md:p-8 fade-in">
-            <div className="max-w-7xl mx-auto">
-                {/* ── Header ── */}
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
-                        <LayoutDashboard size={22} className="text-indigo-400" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-100">Dashboard</h1>
-                        <p className="text-sm text-slate-400">Project overview & activity</p>
-                    </div>
+        <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="space-y-8 max-w-7xl mx-auto"
+        >
+            <motion.div variants={fadeUp} className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-display font-bold text-white tracking-tight">Overview</h1>
+                    <p className="text-slate-400 mt-1">Welcome back. Here's what's happening today.</p>
                 </div>
+            </motion.div>
 
-                {/* ── Stat Cards ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-                    {statCards.map((card, idx) => {
-                        const Icon = card.icon;
-                        return (
-                            <div
-                                key={idx}
-                                className="relative overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/60 backdrop-blur-sm p-5 transition-all duration-200 hover:border-slate-600 hover:shadow-lg card-glow group"
-                            >
-                                {/* Gradient accent on top */}
-                                <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${card.gradient}`} />
+            <motion.div variants={staggerContainer} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard
+                    title="Total Projects"
+                    value={data?.totalProjects}
+                    icon={LayoutDashboard}
+                    colorClass="text-indigo-400 bg-indigo-500/10 border-indigo-500/20"
+                    gradientClass="from-indigo-500"
+                />
+                <StatCard
+                    title="Open Tasks"
+                    value={(data?.tasksByStatus.TODO || 0) + (data?.tasksByStatus.IN_PROGRESS || 0)}
+                    icon={Activity}
+                    colorClass="text-violet-400 bg-violet-500/10 border-violet-500/20"
+                    gradientClass="from-violet-500"
+                />
+                <StatCard
+                    title="Overdue Tasks"
+                    value={data?.overdueTasks}
+                    icon={AlertCircle}
+                    colorClass="text-rose-400 bg-rose-500/10 border-rose-500/20"
+                    gradientClass="from-rose-500"
+                />
+                <StatCard
+                    title="Team Members"
+                    value={data?.teamSize}
+                    icon={Users}
+                    colorClass="text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                    gradientClass="from-emerald-500"
+                />
+            </motion.div>
 
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <p className="text-sm text-slate-400 mb-1">{card.label}</p>
-                                        <p className="text-3xl font-extrabold text-slate-100">{card.value}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <motion.div variants={fadeUp} className="lg:col-span-2 rounded-2xl bg-surface-primary/40 border border-white/[0.08] overflow-hidden">
+                    <div className="px-6 py-5 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02]">
+                        <h2 className="font-semibold text-white">Task Progress</h2>
+                    </div>
+                    <div className="p-6 h-[300px] flex items-end justify-between gap-4">
+                        {/* Placeholder for a beautiful chart. Since no chart library was requested, we use simple CSS bars */}
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => {
+                            const height = 40 + Math.random() * 60;
+                            return (
+                                <div key={day} className="flex flex-col items-center gap-3 w-full group">
+                                    <div className="w-full relative h-[200px] rounded-t-lg bg-surface-secondary overflow-hidden">
+                                        <div
+                                            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-lg transition-all duration-500 group-hover:brightness-110"
+                                            style={{ height: `${height}%` }}
+                                        />
                                     </div>
-                                    <div className={`p-2.5 rounded-xl ${card.iconBg}`}>
-                                        <Icon size={22} className={card.iconColor} />
-                                    </div>
+                                    <span className="text-xs font-medium text-slate-500">{day}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </motion.div>
+
+                <motion.div variants={fadeUp} className="rounded-2xl bg-surface-primary/40 border border-white/[0.08] flex flex-col">
+                    <div className="px-6 py-5 border-b border-white/[0.08] bg-white/[0.02]">
+                        <h2 className="font-semibold text-white">Recent Activity</h2>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2">
+                        {data?.recentActivity?.map((activity, i) => (
+                            <div key={activity.id} className="flex gap-4 p-4 rounded-xl hover:bg-white/[0.02] transition-colors cursor-default">
+                                <div className="mt-1">
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-glow-sm ring-4 ring-indigo-500/10" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-slate-300">
+                                        <span className="font-medium text-white">{activity.actorName}</span>
+                                        {' '}
+                                        {activity.type === 'status_change' ? 'moved' : activity.type === 'comment' ? 'commented on' : 'created'}
+                                        {' '}
+                                        <span className="font-medium text-indigo-300">{activity.taskTitle}</span>
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                                    </p>
                                 </div>
                             </div>
-                        );
-                    })}
-                </div>
-
-                {/* ── Activity + Overdue Grid ── */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Recent Activity */}
-                    <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 backdrop-blur-sm overflow-hidden">
-                        <div className="px-5 py-4 border-b border-slate-700/50 flex items-center gap-2">
-                            <Activity size={18} className="text-indigo-400" />
-                            <h2 className="text-base font-semibold text-slate-200">Recent Activity</h2>
-                        </div>
-                        <div className="divide-y divide-slate-700/40 max-h-[360px] overflow-y-auto">
-                            {data.recentActivity.map((event, idx) => {
-                                const actConfig = ACTIVITY_ICONS[event.type] || ACTIVITY_ICONS.TASK_CREATED;
-                                const ActIcon = actConfig.icon;
-                                return (
-                                    <div
-                                        key={idx}
-                                        className="px-5 py-3.5 flex items-start gap-3 hover:bg-slate-700/20 transition-colors"
-                                    >
-                                        <div className={`p-1.5 rounded-lg ${actConfig.bg} mt-0.5`}>
-                                            <ActIcon size={14} className={actConfig.color} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm text-slate-200 leading-snug">
-                                                <span className="font-medium">{event.actorName}</span>{' '}
-                                                <span className="text-slate-400">
-                                                    {event.type === 'TASK_CREATED' && 'created'}
-                                                    {event.type === 'STATUS_CHANGED' && 'updated status of'}
-                                                    {event.type === 'COMMENT_ADDED' && 'commented on'}
-                                                    {event.type === 'TASK_ASSIGNED' && 'assigned'}
-                                                </span>{' '}
-                                                <span className="text-slate-300">"{event.taskTitle}"</span>
-                                            </p>
-                                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                                                <Clock size={10} /> {formatTimestamp(event.timestamp)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                        ))}
                     </div>
-
-                    {/* Overdue Tasks Panel */}
-                    <div className="rounded-xl border border-slate-700/50 bg-slate-800/60 backdrop-blur-sm overflow-hidden">
-                        <div className="px-5 py-4 border-b border-slate-700/50 flex items-center gap-2">
-                            <AlertTriangle size={18} className="text-red-400" />
-                            <h2 className="text-base font-semibold text-slate-200">Overdue Tasks</h2>
-                            <span className="ml-auto inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-red-500/15 text-xs font-bold text-red-400">
-                                {data.overdueTasksList.length}
-                            </span>
-                        </div>
-                        <div className="divide-y divide-slate-700/40">
-                            {data.overdueTasksList.map((task) => (
-                                <div
-                                    key={task.id}
-                                    className="px-5 py-4 hover:bg-slate-700/20 transition-colors"
-                                >
-                                    <div className="flex items-start justify-between mb-1.5">
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-200">{task.title}</p>
-                                            <p className="text-xs text-slate-500 mt-0.5">{task.projectName}</p>
-                                        </div>
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-500/10 text-xs font-semibold text-red-400 whitespace-nowrap">
-                                            {task.daysOverdue} day{task.daysOverdue !== 1 ? 's' : ''} overdue
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[8px] font-bold text-white">
-                                            {task.assignee.name
-                                                .split(' ')
-                                                .map((n) => n[0])
-                                                .join('')}
-                                        </div>
-                                        <span className="text-xs text-slate-400">{task.assignee.name}</span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── Task Status Breakdown ── */}
-                <div className="mt-6 rounded-xl border border-slate-700/50 bg-slate-800/60 backdrop-blur-sm p-5">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-4">Tasks by Status</h3>
-                    <div className="flex gap-3 h-3 rounded-full overflow-hidden bg-slate-700/50">
-                        <div
-                            className="bg-blue-500 rounded-full transition-all duration-500"
-                            style={{ width: `${(data.tasksByStatus.TODO / data.totalTasks) * 100}%` }}
-                            title={`To Do: ${data.tasksByStatus.TODO}`}
-                        />
-                        <div
-                            className="bg-amber-500 rounded-full transition-all duration-500"
-                            style={{ width: `${(data.tasksByStatus.IN_PROGRESS / data.totalTasks) * 100}%` }}
-                            title={`In Progress: ${data.tasksByStatus.IN_PROGRESS}`}
-                        />
-                        <div
-                            className="bg-emerald-500 rounded-full transition-all duration-500"
-                            style={{ width: `${(data.tasksByStatus.DONE / data.totalTasks) * 100}%` }}
-                            title={`Done: ${data.tasksByStatus.DONE}`}
-                        />
-                    </div>
-                    <div className="flex items-center gap-6 mt-3">
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                            <span className="text-xs text-slate-400">To Do ({data.tasksByStatus.TODO})</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                            <span className="text-xs text-slate-400">In Progress ({data.tasksByStatus.IN_PROGRESS})</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                            <span className="text-xs text-slate-400">Done ({data.tasksByStatus.DONE})</span>
-                        </div>
-                    </div>
-                </div>
+                </motion.div>
             </div>
-        </div>
+        </motion.div>
     );
 }
+// 3-line usage example:
+// import Dashboard from './pages/Dashboard';
+// <Route path="/" element={<Dashboard />} />
