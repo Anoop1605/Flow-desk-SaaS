@@ -48,3 +48,11 @@ Thumbs.db
 # BlueJ / J2ME
 *.ctxt
 .mtj.tmp/
+
+# Instructions
+Instruction-member1.md
+context.md
+
+#docx
+*.docx 
+*.pdf
