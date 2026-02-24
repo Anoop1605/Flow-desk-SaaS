@@ -56,3 +56,4 @@ context.md
 #docx
 *.docx 
 *.pdf
+system_prompt.md
