@@ -52,8 +52,9 @@ Thumbs.db
 # Instructions
 Instruction-member1.md
 context.md
+.agent/
 
 #docx
 *.docx 
 *.pdf
-system_prompt.md
+ 
