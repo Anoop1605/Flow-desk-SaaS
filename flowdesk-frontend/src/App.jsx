@@ -1,6 +1,6 @@
-import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, useLocation, Outlet } from 'react-router-dom';
 import { LayoutDashboard, KanbanSquare, CheckSquare, Search, Menu, X, Bell } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from './lib/utils';
 import { useUIStore } from './stores/uiStore';
@@ -9,8 +9,11 @@ import KanbanBoard from './pages/KanbanBoard';
 import ProtectedRoute from './components/ProtectedRoute';
 import CommandPalette from './components/CommandPalette';
 import TaskDetailDrawer from './components/TaskDetailDrawer';
+import { AuthProvider } from './contexts/AuthContext';
 
 function Sidebar({ isOpen, setIsOpen }) {
+// ... rest remains same until DashboardLayout
+
   const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
 
   const navLinks = [
@@ -126,40 +129,49 @@ function Topbar({ setSidebarOpen }) {
   );
 }
 
-export default function App() {
+function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <BrowserRouter>
-      <div className="flex min-h-[100dvh] bg-surface-canvas selection:bg-indigo-500/30">
-        <CommandPalette />
-        <TaskDetailDrawer />
-        <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+    <div className="flex min-h-[100dvh] bg-surface-canvas selection:bg-indigo-500/30">
+      <CommandPalette />
+      <TaskDetailDrawer />
+      <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
-        <div className="flex-1 flex flex-col min-w-0">
-          <Topbar setSidebarOpen={setSidebarOpen} />
+      <div className="flex-1 flex flex-col min-w-0">
+        <Topbar setSidebarOpen={setSidebarOpen} />
 
-          <main className="flex-1 overflow-x-hidden p-6 md:p-8">
-            <AnimatePresence mode="wait">
-              <Routes>
-                <Route path="/" element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                } />
-                <Route path="/projects/:id/board" element={
-                  <ProtectedRoute>
-                    <KanbanBoard />
-                  </ProtectedRoute>
-                } />
-                {/* Fallback for components not built yet */}
-                <Route path="*" element={<div className="text-slate-400">Coming Soon</div>} />
-              </Routes>
-            </AnimatePresence>
-          </main>
-        </div>
+        <main className="flex-1 overflow-x-hidden p-6 md:p-8">
+          <AnimatePresence mode="wait">
+            <Outlet />
+          </AnimatePresence>
+        </main>
       </div>
-    </BrowserRouter>
+    </div>
   );
 }
 
+export default function App() {
+  return (
+    <BrowserRouter>
+      {/* ⚠️ AuthProvider must be inside BrowserRouter because it uses useLocation internally */}
+      <AuthProvider>
+        <Routes>
+          {/* PUBLIC ROUTES (No Sidebar) */}
+          <Route path="/login" element={<div className="text-white p-8">Login Page Coming Soon</div>} />
+          <Route path="/register" element={<div className="text-white p-8">Register Page Coming Soon</div>} />
+
+          {/* PRIVATE ROUTES (Wrapped in DashboardLayout AND ProtectedRoute) */}
+          <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/projects/:id/board" element={<KanbanBoard />} />
+            <Route path="/my-tasks" element={<div className="text-white">My Tasks Coming Soon</div>} />
+          </Route>
+
+          {/* Fallback */}
+          <Route path="*" element={<div className="text-slate-400 p-8">404 - Not Found</div>} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
