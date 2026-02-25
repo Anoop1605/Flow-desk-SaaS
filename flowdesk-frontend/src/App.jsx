@@ -10,6 +10,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import CommandPalette from './components/CommandPalette';
 import TaskDetailDrawer from './components/TaskDetailDrawer';
 import { AuthProvider } from './contexts/AuthContext';
+import LoginPage from './pages/LoginPage';
 
 function Sidebar({ isOpen, setIsOpen }) {
 // ... rest remains same until DashboardLayout
@@ -158,7 +159,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           {/* PUBLIC ROUTES (No Sidebar) */}
-          <Route path="/login" element={<div className="text-white p-8">Login Page Coming Soon</div>} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<div className="text-white p-8">Register Page Coming Soon</div>} />
 
           {/* PRIVATE ROUTES (Wrapped in DashboardLayout AND ProtectedRoute) */}
