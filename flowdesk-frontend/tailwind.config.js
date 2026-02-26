@@ -32,6 +32,7 @@ export default {
                     primary: '#121214',
                     secondary: '#1A1A1D',
                     tertiary: '#27272A',
+                    raised: '#1E1E22',
                 },
             },
             boxShadow: {

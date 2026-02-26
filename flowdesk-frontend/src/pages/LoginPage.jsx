@@ -117,7 +117,7 @@ export default function LoginPage() {
                 // This is where react-hook-form takes over the input
                 {...register('email')}
                 className={cn(
-                  "w-full bg-surface-raised border rounded-lg px-4 py-2.5 text-slate-200 placeholder:text-slate-600 transition-colors",
+                  "w-full bg-surface-raised border rounded-lg px-4 py-2.5 text-white placeholder:text-slate-500 transition-colors",
                   errors.email 
                     ? "border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/20" 
                     : "border-white/10 focus:border-brand-500 focus:ring-brand-500/20"
@@ -138,7 +138,7 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   {...register('password')}
                   className={cn(
-                    "w-full bg-surface-raised border rounded-lg pl-4 pr-10 py-2.5 text-slate-200 placeholder:text-slate-600 transition-colors",
+                    "w-full bg-surface-raised border rounded-lg pl-4 pr-10 py-2.5 text-white placeholder:text-slate-500 transition-colors",
                     errors.password 
                       ? "border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/20" 
                       : "border-white/10 focus:border-brand-500 focus:ring-brand-500/20"

@@ -1,7 +1,8 @@
-import { BrowserRouter, Routes, Route, NavLink, useLocation, Outlet } from 'react-router-dom';
-import { LayoutDashboard, KanbanSquare, CheckSquare, Search, Menu, X, Bell } from 'lucide-react';
+import { BrowserRouter, Routes, Route, NavLink, useLocation, Outlet, Link } from 'react-router-dom';
+import { LayoutDashboard, KanbanSquare, CheckSquare, Search, Menu, X, Bell, UserCircle, Activity } from 'lucide-react';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Toaster } from 'sonner';
 import { cn } from './lib/utils';
 import { useUIStore } from './stores/uiStore';
 import Dashboard from './pages/Dashboard';
@@ -11,6 +12,9 @@ import CommandPalette from './components/CommandPalette';
 import TaskDetailDrawer from './components/TaskDetailDrawer';
 import { AuthProvider } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ProfilePage from './pages/ProfilePage';
+import ActivityLogPage from './pages/ActivityLogPage';
 
 function Sidebar({ isOpen, setIsOpen }) {
 // ... rest remains same until DashboardLayout
@@ -21,6 +25,8 @@ function Sidebar({ isOpen, setIsOpen }) {
     { name: 'Dashboard', to: '/', icon: LayoutDashboard },
     { name: 'Kanban Board', to: '/projects/1/board', icon: KanbanSquare },
     { name: 'My Tasks', to: '/my-tasks', icon: CheckSquare },
+    { name: 'Profile', to: '/profile', icon: UserCircle },
+    { name: 'Activity', to: '/activity', icon: Activity },
   ];
 
   return (
@@ -122,9 +128,9 @@ function Topbar({ setSidebarOpen }) {
           <Bell size={18} />
           <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 border border-surface-primary"></span>
         </button>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-sm font-medium text-white shadow-glow-sm cursor-pointer border border-white/[0.08]">
+        <Link to="/profile" className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-sm font-medium text-white shadow-glow-sm cursor-pointer border border-white/[0.08] hover:shadow-glow-md transition-shadow">
           MP
-        </div>
+        </Link>
       </div>
     </header>
   );
@@ -157,16 +163,34 @@ export default function App() {
     <BrowserRouter>
       {/* ⚠️ AuthProvider must be inside BrowserRouter because it uses useLocation internally */}
       <AuthProvider>
+        {/* Sonner Toaster — FlowDesk dark theme styling */}
+        {/* WHY here? Toaster must be at the root so toast() works from ANY component */}
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: '#1E293B',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#E2E8F0',
+              fontFamily: 'DM Sans, sans-serif',
+            },
+          }}
+          richColors
+          closeButton
+        />
+
         <Routes>
           {/* PUBLIC ROUTES (No Sidebar) */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<div className="text-white p-8">Register Page Coming Soon</div>} />
+          <Route path="/register" element={<RegisterPage />} />
 
           {/* PRIVATE ROUTES (Wrapped in DashboardLayout AND ProtectedRoute) */}
           <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/projects/:id/board" element={<KanbanBoard />} />
             <Route path="/my-tasks" element={<div className="text-white">My Tasks Coming Soon</div>} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/activity" element={<ActivityLogPage />} />
           </Route>
 
           {/* Fallback */}
