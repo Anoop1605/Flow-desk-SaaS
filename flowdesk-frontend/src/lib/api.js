@@ -21,13 +21,13 @@ api.interceptors.request.use((config) => {
     //      React hooks can only be called inside React components.
     //      getState() lets us read Zustand outside of React. ← KEY CONCEPT
     const token = useAuthStore.getState().token;
-    
+
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
         // WHY "Bearer"? It's part of the OAuth2 spec.
         // The backend Spring Security parser expects this exact prefix.
     }
-    
+
     return config; // MUST return config or the request gets swallowed!
 });
 // 3. RESPONSE INTERCEPTOR — The "Security Response Team"
@@ -55,22 +55,38 @@ api.interceptors.response.use(
 //      This is cleaner and easier to update if the endpoint changes.
 export const authApi = {
     register: (data) => api.post('/api/auth/register', data),
-    login:    (data) => api.post('/api/auth/login', data),
-    me:       ()     => api.get('/api/auth/me'),
-    logout:   ()     => api.post('/api/auth/logout'),
+    login: (data) => api.post('/api/auth/login', data),
+    me: () => api.get('/api/auth/me'),
+    logout: () => api.post('/api/auth/logout'),
 };
 export const activityApi = {
     getActivityFeed: (params) => api.get('/api/activity', { params }),
+};
+
+// 5b. PROJECT API HELPERS — Member 2
+export const projectApi = {
+    getAll: () => api.get('/api/projects'),
+    getById: (id) => api.get(`/api/projects/${id}`),
+    create: (data) => api.post('/api/projects', data),
+    update: (id, data) => api.put(`/api/projects/${id}`, data),
+    delete: (id) => api.delete(`/api/projects/${id}`),
+    getMembers: (id) => api.get(`/api/projects/${id}/members`),
+    addMember: (id, data) => api.post(`/api/projects/${id}/members`, data),
+    removeMember: (id, userId) => api.delete(`/api/projects/${id}/members/${userId}`),
+    updateRole: (id, userId, data) => api.put(`/api/projects/${id}/members/${userId}`, data),
 };
 // 5. QUERY KEYS — Centralized for TanStack Query
 // WHY: Every useQuery call needs a key. Defining them here means
 //      if a key changes, we update ONE place, not 10 components.
 export const queryKeys = {
-    dashboard:  ['dashboard'],
-    tasks:      (projectId) => ['tasks', projectId],
-    myTasks:    ['my-tasks'],
-    comments:   (taskId)   => ['comments', taskId],
-    me:         ['me'],
-    activity:   (params)   => ['activity', params],
-    tenants:    ['tenants'],
+    dashboard: ['dashboard'],
+    tasks: (projectId) => ['tasks', projectId],
+    myTasks: ['my-tasks'],
+    comments: (taskId) => ['comments', taskId],
+    me: ['me'],
+    activity: (params) => ['activity', params],
+    tenants: ['tenants'],
+    projects: ['projects'],
+    project: (id) => ['project', id],
+    projectMembers: (id) => ['project-members', id],
 };

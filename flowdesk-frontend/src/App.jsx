@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, useLocation, Outlet, Link } from 'react-router-dom';
-import { LayoutDashboard, KanbanSquare, CheckSquare, Search, Menu, X, Bell, UserCircle, Activity } from 'lucide-react';
+import { LayoutDashboard, KanbanSquare, CheckSquare, Search, Menu, X, Bell, UserCircle, Activity, FolderKanban, Users } from 'lucide-react';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Toaster } from 'sonner';
@@ -15,14 +15,19 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
 import ActivityLogPage from './pages/ActivityLogPage';
+import ProjectsListPage from './pages/ProjectsListPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
+import TeamPage from './pages/TeamPage';
 
 function Sidebar({ isOpen, setIsOpen }) {
-// ... rest remains same until DashboardLayout
+  // ... rest remains same until DashboardLayout
 
   const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
 
   const navLinks = [
     { name: 'Dashboard', to: '/', icon: LayoutDashboard },
+    { name: 'Projects', to: '/projects', icon: FolderKanban },
+    { name: 'Team', to: '/team', icon: Users },
     { name: 'Kanban Board', to: '/projects/1/board', icon: KanbanSquare },
     { name: 'My Tasks', to: '/my-tasks', icon: CheckSquare },
     { name: 'Profile', to: '/profile', icon: UserCircle },
@@ -187,7 +192,10 @@ export default function App() {
           {/* PRIVATE ROUTES (Wrapped in DashboardLayout AND ProtectedRoute) */}
           <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/projects" element={<ProjectsListPage />} />
+            <Route path="/projects/:id" element={<ProjectDetailPage />} />
             <Route path="/projects/:id/board" element={<KanbanBoard />} />
+            <Route path="/team" element={<TeamPage />} />
             <Route path="/my-tasks" element={<div className="text-white">My Tasks Coming Soon</div>} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/activity" element={<ActivityLogPage />} />

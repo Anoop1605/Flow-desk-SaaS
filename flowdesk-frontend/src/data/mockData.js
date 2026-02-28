@@ -144,3 +144,68 @@ export const MOCK_DASHBOARD = {
         { id: 10, title: 'Finalize API rate limiting', projectName: 'API Platform', dueDate: '2026-02-19', assignee: { id: 5, name: 'Evan Park' }, daysOverdue: 4 },
     ],
 };
+
+// ===== Mock Project Data for Phase 1 (Member 2) =====
+
+export const MOCK_PROJECTS = [
+    {
+        id: 1,
+        name: 'Website Redesign',
+        description: 'Complete overhaul of the company website with modern design, improved UX, and mobile-first approach.',
+        status: 'ACTIVE',
+        colorTag: '#6366f1',
+        ownerId: 4,
+        ownerName: 'Diana Lee',
+        memberCount: 5,
+        taskCount: 9,
+        createdAt: '2026-01-15T09:00:00Z',
+        updatedAt: '2026-02-23T14:30:00Z',
+    },
+    {
+        id: 2,
+        name: 'Mobile App MVP',
+        description: 'Build the first version of our mobile application targeting iOS and Android platforms.',
+        status: 'ACTIVE',
+        colorTag: '#8b5cf6',
+        ownerId: 1,
+        ownerName: 'Alice Johnson',
+        memberCount: 4,
+        taskCount: 12,
+        createdAt: '2026-01-20T10:00:00Z',
+        updatedAt: '2026-02-22T16:00:00Z',
+    },
+    {
+        id: 3,
+        name: 'API Platform',
+        description: 'Develop a public-facing REST API platform with developer documentation and rate limiting.',
+        status: 'ON_HOLD',
+        colorTag: '#f59e0b',
+        ownerId: 3,
+        ownerName: 'Charlie Davis',
+        memberCount: 3,
+        taskCount: 7,
+        createdAt: '2026-02-01T08:30:00Z',
+        updatedAt: '2026-02-20T11:00:00Z',
+    },
+    {
+        id: 4,
+        name: 'Q1 Marketing Campaign',
+        description: 'Plan and execute the Q1 digital marketing campaign across social media and email channels.',
+        status: 'COMPLETED',
+        colorTag: '#10b981',
+        ownerId: 2,
+        ownerName: 'Bob Smith',
+        memberCount: 6,
+        taskCount: 15,
+        createdAt: '2025-11-01T09:00:00Z',
+        updatedAt: '2026-02-15T17:00:00Z',
+    },
+];
+
+export const MOCK_PROJECT_MEMBERS = [
+    { id: 1, userId: 1, userName: 'Alice Johnson', userEmail: 'alice@flowdesk.io', roleInProject: 'MANAGER', joinedAt: '2026-01-15T09:00:00Z' },
+    { id: 2, userId: 2, userName: 'Bob Smith', userEmail: 'bob@flowdesk.io', roleInProject: 'MEMBER', joinedAt: '2026-01-16T10:00:00Z' },
+    { id: 3, userId: 3, userName: 'Charlie Davis', userEmail: 'charlie@flowdesk.io', roleInProject: 'MEMBER', joinedAt: '2026-01-18T11:00:00Z' },
+    { id: 4, userId: 4, userName: 'Diana Lee', userEmail: 'diana@flowdesk.io', roleInProject: 'MANAGER', joinedAt: '2026-01-15T09:00:00Z' },
+    { id: 5, userId: 5, userName: 'Evan Park', userEmail: 'evan@flowdesk.io', roleInProject: 'MEMBER', joinedAt: '2026-02-01T14:00:00Z' },
+];
