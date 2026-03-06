@@ -70,13 +70,14 @@ export default function CreateProjectModal({ open, onOpenChange }) {
                                 className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
                             />
                         </Dialog.Overlay>
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <Dialog.Content asChild>
                             <motion.div
                                 variants={modalVariants}
                                 initial="hidden"
                                 animate="visible"
                                 exit="exit"
-                                className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg rounded-2xl bg-surface-primary border border-white/[0.1] shadow-2xl"
+                                className="w-full max-w-lg rounded-2xl bg-surface-primary border border-white/[0.1] shadow-2xl"
                             >
                                 {/* Header */}
                                 <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08]">
@@ -181,6 +182,7 @@ export default function CreateProjectModal({ open, onOpenChange }) {
                                 </form>
                             </motion.div>
                         </Dialog.Content>
+                        </div>
                     </Dialog.Portal>
                 )}
             </AnimatePresence>

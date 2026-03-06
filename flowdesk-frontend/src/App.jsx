@@ -18,6 +18,7 @@ import ActivityLogPage from './pages/ActivityLogPage';
 import ProjectsListPage from './pages/ProjectsListPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import TeamPage from './pages/TeamPage';
+import MyTasksPage from './pages/MyTasksPage';
 
 function Sidebar({ isOpen, setIsOpen }) {
   // ... rest remains same until DashboardLayout
@@ -196,7 +197,7 @@ export default function App() {
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
             <Route path="/projects/:id/board" element={<KanbanBoard />} />
             <Route path="/team" element={<TeamPage />} />
-            <Route path="/my-tasks" element={<div className="text-white">My Tasks Coming Soon</div>} />
+            <Route path="/my-tasks" element={<MyTasksPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/activity" element={<ActivityLogPage />} />
           </Route>
