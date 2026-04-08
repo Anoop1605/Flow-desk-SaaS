@@ -212,27 +212,36 @@ export default function RegisterPage() {
     [goToStep]
   );
 
+  const { register: authRegister } = useAuth();
+
   // ── Final Submit ─────────────────────────────────────────────────────────
   const handleCreateWorkspace = useCallback(async () => {
     setIsSubmitting(true);
     try {
-      // Phase 1: Simulate API call
-      // Phase 2: Replace with → await api.post('/api/auth/register', formData);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Map local formData to RegisterRequest DTO
+      const requestData = {
+        email: formData.email,
+        password: formData.password,
+        name: `${formData.firstName} ${formData.lastName}`,
+        organizationName: formData.orgName,
+      };
 
-      // Success! Show toast and redirect to login
+      await authRegister(requestData);
+
+      // Success! Show toast and redirect to dashboard (AuthContext handles state)
       toast.success('Workspace created!', {
-        description: 'Log in to get started.',
+        description: 'Welcome to FlowDesk!',
       });
-      navigate('/login', { replace: true });
+      navigate('/', { replace: true });
     } catch (err) {
+      console.error('Registration error:', err);
       toast.error('Registration failed', {
-        description: 'Something went wrong. Please try again.',
+        description: err.response?.data || 'Something went wrong. Please try again.',
       });
     } finally {
       setIsSubmitting(false);
     }
-  }, [formData, navigate]);
+  }, [formData, navigate, authRegister]);
 
   return (
     <div className="min-h-screen bg-surface-canvas flex flex-col items-center justify-center p-4 selection:bg-brand-500/30">

@@ -13,21 +13,10 @@ import { fadeUp, staggerContainer } from '../lib/animations';
 import { cn } from '../lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
-// STUB: Simulate an API call to /api/dashboard for Phase 1
+// Real dashboard statistics call for Phase 2
 const fetchDashboardStats = async () => {
-    // In Phase 2: const res = await api.get('/api/dashboard'); return res.data;
-    return new Promise((resolve) => setTimeout(() => resolve({
-        totalProjects: 12,
-        totalTasks: 48,
-        tasksByStatus: { TODO: 15, IN_PROGRESS: 20, DONE: 13 },
-        overdueTasks: 5,
-        teamSize: 8,
-        recentActivity: [
-            { id: 1, type: 'status_change', taskTitle: 'Implement user auth', actorName: 'Alice Johnson', timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString() },
-            { id: 2, type: 'comment', taskTitle: 'Design system review', actorName: 'Bob Smith', timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString() },
-            { id: 3, type: 'create', taskTitle: 'Setup CI/CD', actorName: 'Diana Lee', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString() },
-        ]
-    }), 800));
+    const res = await api.get('/api/dashboard');
+    return res.data;
 };
 
 function StatCard({ title, value, icon: Icon, colorClass, gradientClass, delay = 0 }) {
@@ -170,11 +159,7 @@ export default function Dashboard() {
                                 </div>
                                 <div>
                                     <p className="text-sm text-slate-300">
-                                        <span className="font-medium text-white">{activity.actorName}</span>
-                                        {' '}
-                                        {activity.type === 'status_change' ? 'moved' : activity.type === 'comment' ? 'commented on' : 'created'}
-                                        {' '}
-                                        <span className="font-medium text-indigo-300">{activity.taskTitle}</span>
+                                        {activity.description}
                                     </p>
                                     <p className="text-xs text-slate-500 mt-1">
                                         {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}

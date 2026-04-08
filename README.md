@@ -1,62 +1,69 @@
-# FlowDesk
+# FlowDesk 🚀
 
-FlowDesk is a SaaS application for team collaboration and task management (featuring Kanban boards, Activity Logs, and Multi-Tenancy).
+FlowDesk is a premium SaaS application for team collaboration and task management. It features enterprise-grade **Multi-Tenancy**, **Real-time Activity Logs**, and a high-performance **Kanban Board**—all powered by a modern **PostgreSQL** persistence layer.
 
-## 🚀 Tech Stack
+## ✨ Features
+
+- **Multi-Tenant Isolation**: Robust data separation at the Organization level.
+- **Dynamic Kanban Board**: Seamlessly manage tasks with drag-and-drop status updates.
+- **Activity Stream**: Real-time audit trail of all project and task changes.
+- **Organization Dashboard**: Instant overview of project progress, open tasks, and recent team activity.
+- **Secure Authentication**: JWT-based stateless security with organization-scoped permissions.
+
+## 🛠 Tech Stack
 
 ### Frontend
 - **Framework:** React 19 + Vite
-- **Styling:** Tailwind CSS, Radix UI Primitives, class-variance-authority, clsx, tailwind-merge
-- **Animation:** Framer Motion
-- **State Management:** Zustand (Client state), `@tanstack/react-query` (Server state)
-- **Routing:** React Router v7
-- **Forms & Validation:** react-hook-form, Zod
-- **Drag and Drop:** @dnd-kit
+- **Styling:** Tailwind CSS, Radix UI Primitives, Lucide Icons
+- **Animation:** Framer Motion (for premium micro-interactions)
+- **State & Data:** Zustand (UI state) + `@tanstack/react-query` (Server state)
+- **Forms:** React Hook Form + Zod validation
 
 ### Backend
-- **Framework:** Spring Boot
-- **Database:** H2 (In-memory for Phase 1), PostgreSQL (Phase 2)
+- **Framework:** Spring Boot 3
+- **Database:** PostgreSQL (Standard-compliant relational storage)
 - **ORM:** Hibernate / Spring Data JPA
+- **Security:** Spring Security + JWT
+- **Performance:** Optimized multi-tenant query filtering
 
 ---
 
 ## 💻 Prerequisites
-Required versions:
-- Node.js (v18+)
-- npm or yarn
-- Java JDK 17+
-- Maven
+
+- **Java JDK 17+**
+- **Node.js (v18+)**
+- **Maven**
+- **PostgreSQL** (Ensure a database named `flowdesk` is created)
 
 ---
 
-## 🏃‍♂️ Running the Project
+## 🏃‍♂️ Getting Started
 
-The application requires both the backend and frontend to be running simultaneously.
+### 1. Database Setup
+Create a PostgreSQL database named `flowdesk`. Update `flowdesk-backend/src/main/resources/application.properties` with your credentials if different from the defaults.
 
-### 1. Start the Backend (Spring Boot)
-Open a terminal and navigate to the `flowdesk-backend` directory, then run:
-
+### 2. Start the Backend
 ```bash
 cd flowdesk-backend
 mvn spring-boot:run
 ```
-The Spring Boot server will start on `http://localhost:8080`.
+The API server will start on `http://localhost:8080`.
 
-### 2. Start the Frontend (Vite/React)
-Open a separate terminal and navigate to the `flowdesk-frontend` directory. Make sure to install dependencies first using `--legacy-peer-deps` due to some peer dependency mismatches with `eslint`:
-
+### 3. Start the Frontend
 ```bash
 cd flowdesk-frontend
 npm install --legacy-peer-deps
 npm run dev
 ```
-The React frontend will start on `http://localhost:5173`. Open this URL in your browser.
+The application will be available at `http://localhost:5173`.
 
 ---
 
 ## 📂 Project Structure
 
-- `/flowdesk-backend`: Spring Boot REST API application.
-- `/flowdesk-frontend`: React user interface application.
-- `/db`: Database schemas or mock data.
-- `Instruction-member*.md`, `WorkDivision_FlowDesk.docx`, `context.md`, `FlowDesk_synopsis...`: Project and contribution specifications.
+- `/flowdesk-backend`: Spring Boot REST API (Java).
+- `/flowdesk-frontend`: React user interface (Vite).
+- `/artifacts`: Project management, implementation plans, and architecture walkthroughs.
+
+## 📄 License
+This project is part of the FSD Coursework.

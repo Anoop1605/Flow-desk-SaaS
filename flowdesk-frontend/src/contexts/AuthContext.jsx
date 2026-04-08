@@ -25,27 +25,34 @@ export function AuthProvider({ children }) {
   // login() — called by the Login page form submit
   // Takes email + password, hits the backend, stores the result
   const login = useCallback(async (email, password) => {
-    // Phase 1: Simulate a successful login with mock data
-    // Phase 2: Replace with → const res = await api.post('/api/auth/login', { email, password });
-    await new Promise((r) => setTimeout(r, 800)); // simulate network delay
+    try {
+      const res = await api.post('/api/auth/login', { email, password });
+      const { token, ...user } = res.data;
 
-    const mockToken = 'mock-jwt-token-phase1';
-    const mockUser = {
-      id: '1',
-      email,
-      name: 'Demo User',
-      role: 'ADMIN',
-      tenantId: 'org_demo',
-    };
-
-    // Store in Zustand — Axios interceptor will now attach this to every request
-    setAuth(mockToken, mockUser);
+      // Store in Zustand — Axios interceptor will now attach this to every request
+      setAuth(token, user);
+    } catch (err) {
+      console.error('Login failed:', err);
+      throw err;
+    }
   }, [setAuth]);
 
-  // logout() — called by sidebar logout button (Phase 2)
+  // register() — added for Phase 2
+  const register = useCallback(async (data) => {
+    try {
+      const res = await api.post('/api/auth/register', data);
+      const { token, ...user } = res.data;
+      setAuth(token, user);
+    } catch (err) {
+      console.error('Registration failed:', err);
+      throw err;
+    }
+  }, [setAuth]);
+
+  // logout() — called by sidebar logout button
   const logout = useCallback(() => {
     clearAuth();
-    // Phase 2: also call api.post('/api/auth/logout') to blacklist token server-side
+    // In Phase 2, we could also call api.post('/api/auth/logout') if tracking tokens
   }, [clearAuth]);
 
   const value = {
@@ -54,6 +61,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!token,  // true if token exists, false if null
     isLoading,
     login,
+    register,
     logout,
   };
 

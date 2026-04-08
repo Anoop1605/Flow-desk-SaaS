@@ -23,18 +23,21 @@ public class TaskCreateRequest {
 
     private LocalDate dueDate;
 
+    private String status;
+
     // ── Constructors ──
     public TaskCreateRequest() {
     }
 
     public TaskCreateRequest(String title, String description, String priority,
-            Long projectId, Long assigneeId, LocalDate dueDate) {
+            Long projectId, Long assigneeId, LocalDate dueDate, String status) {
         this.title = title;
         this.description = description;
         this.priority = priority;
         this.projectId = projectId;
         this.assigneeId = assigneeId;
         this.dueDate = dueDate;
+        this.status = status;
     }
 
     // ── Getters & Setters ──
@@ -84,5 +87,13 @@ public class TaskCreateRequest {
 
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

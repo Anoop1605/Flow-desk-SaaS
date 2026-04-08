@@ -13,17 +13,17 @@ import java.util.List;
  */
 public interface TaskService {
 
-    TaskResponse createTask(TaskCreateRequest request);
+    TaskResponse createTask(TaskCreateRequest request, Long organizationId, Long userId, String userName);
 
-    TaskResponse getTaskById(Long id);
+    TaskResponse getTaskById(Long id, Long organizationId);
 
-    List<TaskResponse> getTasksByProjectId(Long projectId);
+    List<TaskResponse> getTasksByProjectId(Long projectId, Long organizationId);
 
-    List<TaskResponse> getTasksByAssigneeId(Long assigneeId);
+    List<TaskResponse> getTasksByAssigneeId(Long assigneeId, Long organizationId);
 
-    TaskResponse updateTask(Long id, TaskCreateRequest request);
+    TaskResponse updateTask(Long id, TaskCreateRequest request, Long organizationId);
 
-    TaskResponse updateTaskStatus(Long id, TaskStatusUpdateRequest request);
+    TaskResponse updateTaskStatus(Long id, TaskStatusUpdateRequest request, Long organizationId, Long userId, String userName);
 
-    void deleteTask(Long id);
+    void deleteTask(Long id, Long organizationId, Long userId, String userName);
 }
