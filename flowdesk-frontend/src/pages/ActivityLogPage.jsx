@@ -21,6 +21,8 @@ import {
   Inbox,
   ChevronDown,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { activityApi, queryKeys } from '../lib/api';
 import * as Avatar from '@radix-ui/react-avatar';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -69,92 +71,7 @@ const ACTION_CONFIG = {
   },
 };
 
-// ─── Mock Activity Data ──────────────────────────────────────────────────────
-// WHY mock data? In Phase 1 we don't have the MongoDB backend yet.
-// Phase 2: Replace with useQuery('activity', () => activityApi.getAll())
-
-const MOCK_ACTIVITIES = [
-  {
-    id: '1',
-    actionType: 'TASK_CREATED',
-    actor: { name: 'Jane Doe', initials: 'JD' },
-    target: 'Design System Setup',
-    description: 'created task',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 min ago
-  },
-  {
-    id: '2',
-    actionType: 'MEMBER_INVITED',
-    actor: { name: 'Admin', initials: 'AD' },
-    target: 'john@flowdesk.io',
-    description: 'invited',
-    timestamp: new Date(Date.now() - 1000 * 60 * 23),
-  },
-  {
-    id: '3',
-    actionType: 'TASK_DONE',
-    actor: { name: 'John Smith', initials: 'JS' },
-    target: 'API Interceptor Config',
-    description: 'completed task',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60),
-  },
-  {
-    id: '4',
-    actionType: 'PROJECT_CREATED',
-    actor: { name: 'Jane Doe', initials: 'JD' },
-    target: 'FlowDesk v2',
-    description: 'created project',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3),
-  },
-  {
-    id: '5',
-    actionType: 'TASK_UPDATED',
-    actor: { name: 'Alice Wang', initials: 'AW' },
-    target: 'Login Page',
-    description: 'updated task',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
-  },
-  {
-    id: '6',
-    actionType: 'PROJECT_ARCHIVED',
-    actor: { name: 'Admin', initials: 'AD' },
-    target: 'Legacy Dashboard',
-    description: 'archived project',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8),
-  },
-  {
-    id: '7',
-    actionType: 'MEMBER_REMOVED',
-    actor: { name: 'Admin', initials: 'AD' },
-    target: 'bob@flowdesk.io',
-    description: 'removed',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-  },
-  {
-    id: '8',
-    actionType: 'TASK_CREATED',
-    actor: { name: 'John Smith', initials: 'JS' },
-    target: 'Kanban Board Drag & Drop',
-    description: 'created task',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 26),
-  },
-  {
-    id: '9',
-    actionType: 'TASK_DONE',
-    actor: { name: 'Alice Wang', initials: 'AW' },
-    target: 'Auth Context Setup',
-    description: 'completed task',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 30),
-  },
-  {
-    id: '10',
-    actionType: 'MEMBER_INVITED',
-    actor: { name: 'Jane Doe', initials: 'JD' },
-    target: 'charlie@flowdesk.io',
-    description: 'invited',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
-  },
-];
+// Phase 2: Removed mock data in favor of real API
 
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
 // WHY skeleton? Better perceived performance than a spinner.
@@ -179,12 +96,22 @@ function SkeletonRow() {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function ActivityLogPage() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [activities, setActivities] = useState(MOCK_ACTIVITIES);
-  const [visibleCount, setVisibleCount] = useState(6);
+  const [visibleCount, setVisibleCount] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTypes, setSelectedTypes] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+
+  const { data: activities = [], isLoading } = useQuery({
+    queryKey: queryKeys.activity({}),
+    queryFn: async () => {
+      const res = await activityApi.getActivityFeed();
+      // Ensure timestamps are Date objects
+      return res.data.map(a => ({
+        ...a,
+        timestamp: new Date(a.timestamp)
+      }));
+    }
+  });
 
   // ── Filter Logic ───────────────────────────────────────────────────────
   const filteredActivities = useMemo(() => {

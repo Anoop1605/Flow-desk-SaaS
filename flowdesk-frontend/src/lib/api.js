@@ -75,6 +75,16 @@ export const projectApi = {
     removeMember: (id, userId) => api.delete(`/api/projects/${id}/members/${userId}`),
     updateRole: (id, userId, data) => api.put(`/api/projects/${id}/members/${userId}`, data),
 };
+
+// 5c. TASK API HELPERS — Member 3
+export const taskApi = {
+    getAll: (projectId) => api.get('/api/tasks', { params: { projectId } }),
+    getById: (id) => api.get(`/api/tasks/${id}`),
+    create: (data) => api.post('/api/tasks', data),
+    update: (id, data) => api.put(`/api/tasks/${id}`, data),
+    updateStatus: (id, status) => api.patch(`/api/tasks/${id}/status`, { status }),
+    delete: (id) => api.delete(`/api/tasks/${id}`),
+};
 // 5. QUERY KEYS — Centralized for TanStack Query
 // WHY: Every useQuery call needs a key. Defining them here means
 //      if a key changes, we update ONE place, not 10 components.

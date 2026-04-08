@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
@@ -21,7 +22,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TaskCard } from '../components/TaskCard';
 import CreateTaskModal from '../components/CreateTaskModal';
 import RoleGuard from '../components/RoleGuard';
-import { api, queryKeys } from '../lib/api';
+import { api, queryKeys, taskApi } from '../lib/api';
 import { cn } from '../lib/utils';
 import { fadeUp } from '../lib/animations';
 
@@ -32,7 +33,7 @@ const COLUMNS = [
 ];
 
 export default function KanbanBoard() {
-    const projectId = 1; // Hardcoded for Phase 1
+    const { id: projectId } = useParams();
     const queryClient = useQueryClient();
 
     const [activeTask, setActiveTask] = useState(null);
@@ -43,9 +44,10 @@ export default function KanbanBoard() {
     const { data: responseData, isLoading, isError } = useQuery({
         queryKey: queryKeys.tasks(projectId),
         queryFn: async () => {
-            const res = await api.get(`/api/tasks?projectId=${projectId}`);
+            const res = await taskApi.getAll(projectId);
             return res.data;
-        }
+        },
+        enabled: !!projectId
     });
 
     // ── Flatten tasks for local state (Optimistic Updates) ──
@@ -112,6 +114,18 @@ export default function KanbanBoard() {
         );
     }, [findColumn]);
 
+    // ── Persistence Mutation ──
+    const updateStatusMutation = useMutation({
+        mutationFn: ({ taskId, newStatus }) => taskApi.updateStatus(taskId, newStatus),
+        onSuccess: () => {
+            queryClient.invalidateQueries(queryKeys.tasks(projectId));
+        },
+        onError: (err) => {
+            toast.error("Failed to update task status");
+            console.error(err);
+        }
+    });
+
     const handleDragEnd = useCallback((event) => {
         const { active, over } = event;
         setActiveTask(null);
@@ -124,16 +138,20 @@ export default function KanbanBoard() {
         const overCol = findColumn(overId);
 
         if (activeCol && overCol && activeCol !== overCol) {
+            // Optimistic UI update
             setLocalTasks(prev =>
                 prev.map(t => t.id === activeId ? { ...t, status: overCol } : t)
             );
+            
+            // Persist to DB
+            updateStatusMutation.mutate({ taskId: activeId, newStatus: overCol });
+            
             const task = localTasks.find(t => t.id === activeId);
-            // STUB: For Phase 2, this will fire PATCH /api/tasks/{id}/status
             toast.success(`Moved to ${COLUMNS.find(c => c.id === overCol)?.title}`, {
                 description: task.title
             });
         }
-    }, [findColumn, localTasks]);
+    }, [findColumn, localTasks, updateStatusMutation, projectId, queryClient]);
 
     const dropAnimation = {
         sideEffects: defaultDropAnimationSideEffects({

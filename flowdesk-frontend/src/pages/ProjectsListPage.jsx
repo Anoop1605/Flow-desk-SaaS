@@ -6,10 +6,9 @@ import {
     Plus, Search, Users, CheckSquare, FolderKanban,
     MoreHorizontal, ArrowUpRight, Filter
 } from 'lucide-react';
-import { queryKeys } from '../lib/api';
+import { queryKeys, projectApi } from '../lib/api';
 import { fadeUp, staggerContainer, cardVariant } from '../lib/animations';
 import { cn } from '../lib/utils';
-import { MOCK_PROJECTS } from '../data/mockData';
 import CreateProjectModal from '../components/CreateProjectModal';
 import RoleGuard from '../components/RoleGuard';
 
@@ -21,10 +20,10 @@ const statusConfig = {
     ARCHIVED: { label: 'Archived', className: 'bg-slate-500/15 text-slate-400 border-slate-500/30' },
 };
 
-// Phase 1: mock fetch
+// Fetch from real backend
 const fetchProjects = async () => {
-    await new Promise((r) => setTimeout(r, 600));
-    return MOCK_PROJECTS;
+    const res = await projectApi.getAll();
+    return res.data;
 };
 
 function ProjectCard({ project }) {

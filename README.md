@@ -59,6 +59,24 @@ The application will be available at `http://localhost:5173`.
 
 ---
 
+## ✅ Phase 3 Status: Ready for Demonstration
+The application has been fully integrated for the final phase. 
+
+- **Live API Integration**: All frontend pages (Projects, Kanban, Activity) are wired to real backend endpoints.
+- **Persistence Verified**: Kanban drag-and-drop state is persisted via PostgreSQL.
+- **Test Coverage**: Core security (JWT) and service logic (Task management) are covered by unit tests.
+- **Build Verified**: Production build is verified and stable on Windows/Linux environments.
+
+---
+
+## 🧪 Verification
+To verify the application:
+1. Run backend tests: `cd flowdesk-backend && mvn test`
+2. Run frontend build: `cd flowdesk-frontend && npm run build`
+3. Launch services and perform end-to-end testing from the browser.
+
+---
+
 ## 📂 Project Structure
 
 - `/flowdesk-backend`: Spring Boot REST API (Java).
