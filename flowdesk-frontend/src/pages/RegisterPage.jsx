@@ -15,6 +15,7 @@
 //   Phase 2: Real API integration
 
 import { useState, useCallback, forwardRef } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';

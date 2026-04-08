@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink, useLocation, Outlet, Link } from 'react-router-dom';
 import { LayoutDashboard, KanbanSquare, CheckSquare, Search, Menu, X, Bell, UserCircle, Activity, FolderKanban, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Toaster } from 'sonner';
 import { cn } from './lib/utils';
@@ -10,7 +10,7 @@ import KanbanBoard from './pages/KanbanBoard';
 import ProtectedRoute from './components/ProtectedRoute';
 import CommandPalette from './components/CommandPalette';
 import TaskDetailDrawer from './components/TaskDetailDrawer';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
@@ -19,17 +19,22 @@ import ProjectsListPage from './pages/ProjectsListPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import TeamPage from './pages/TeamPage';
 import MyTasksPage from './pages/MyTasksPage';
+import CreateTaskModal from './components/CreateTaskModal';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { taskApi, queryKeys } from './lib/api';
+import { toast } from 'sonner';
 
 function Sidebar({ isOpen, setIsOpen }) {
   // ... rest remains same until DashboardLayout
 
   const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
 
+  const lastProjectId = useUIStore((s) => s.lastProjectId);
   const navLinks = [
     { name: 'Dashboard', to: '/', icon: LayoutDashboard },
     { name: 'Projects', to: '/projects', icon: FolderKanban },
     { name: 'Team', to: '/team', icon: Users },
-    { name: 'Kanban Board', to: '/projects/1/board', icon: KanbanSquare },
+    { name: 'Kanban Board', to: lastProjectId ? `/projects/${lastProjectId}/board` : '/projects', icon: KanbanSquare },
     { name: 'My Tasks', to: '/my-tasks', icon: CheckSquare },
     { name: 'Profile', to: '/profile', icon: UserCircle },
     { name: 'Activity', to: '/activity', icon: Activity },
@@ -122,6 +127,11 @@ function Sidebar({ isOpen, setIsOpen }) {
 }
 
 function Topbar({ setSidebarOpen }) {
+  const { user } = useAuth();
+  const initials = user?.name 
+    ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '??';
+
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 border-b border-white/[0.08] bg-surface-primary/80 backdrop-blur-xl">
       <div className="flex items-center gap-4">
@@ -135,7 +145,7 @@ function Topbar({ setSidebarOpen }) {
           <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 border border-surface-primary"></span>
         </button>
         <Link to="/profile" className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-sm font-medium text-white shadow-glow-sm cursor-pointer border border-white/[0.08] hover:shadow-glow-md transition-shadow">
-          MP
+          {initials}
         </Link>
       </div>
     </header>
@@ -144,11 +154,46 @@ function Topbar({ setSidebarOpen }) {
 
 function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isCreateTaskModalOpen, closeCreateTaskModal, modalDefaultStatus } = useUIStore();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  // Extract projectId from URL if present (e.g. /projects/1/board)
+  const pathMatch = location.pathname.match(/\/projects\/(\d+)/);
+  const projectId = pathMatch ? pathMatch[1] : null;
+  const setLastProjectId = useUIStore((s) => s.setLastProjectId);
+
+  // Persist last visited project
+  useEffect(() => {
+    if (projectId) setLastProjectId(projectId);
+  }, [projectId, setLastProjectId]);
+
+  const createTaskMutation = useMutation({
+    mutationFn: (taskData) => {
+      if (!projectId) {
+        throw new Error("Please select a project first.");
+      }
+      return taskApi.create({ ...taskData, projectId: parseInt(projectId) });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(queryKeys.tasks(projectId));
+      closeCreateTaskModal();
+      toast.success("Task created!");
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to create task");
+    }
+  });
 
   return (
     <div className="flex min-h-[100dvh] bg-surface-canvas selection:bg-indigo-500/30">
       <CommandPalette />
       <TaskDetailDrawer />
+      <CreateTaskModal
+        isOpen={isCreateTaskModalOpen}
+        onClose={closeCreateTaskModal}
+        onSubmit={(data) => createTaskMutation.mutateAsync(data)}
+        defaultStatus={modalDefaultStatus}
+      />
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
       <div className="flex-1 flex flex-col min-w-0">

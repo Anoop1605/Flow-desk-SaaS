@@ -13,8 +13,8 @@ import RoleGuard from '../components/RoleGuard';
 import { formatDistanceToNow } from 'date-fns';
 
 const roleConfig = {
-    MANAGER: { label: 'Manager', className: 'bg-violet-500/15 text-violet-400 border-violet-500/30', icon: Crown },
-    MEMBER: { label: 'Member', className: 'bg-slate-500/15 text-slate-300 border-slate-500/30', icon: Users },
+    ORGANIZATION_OWNER: { label: 'Owner', className: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30', icon: Crown },
+    ORGANIZATION_MEMBER: { label: 'Member', className: 'bg-slate-500/15 text-slate-300 border-slate-500/30', icon: Users },
 };
 
 // Phase 1: mock fetch for all org members
@@ -22,9 +22,9 @@ const fetchTeamMembers = async () => {
     await new Promise((r) => setTimeout(r, 500));
     // Simulate org-wide members (combine with distinct roles)
     return [
-        ...MOCK_PROJECT_MEMBERS,
-        { id: 6, userId: 6, userName: 'Fiona Carter', userEmail: 'fiona@flowdesk.io', roleInProject: 'MEMBER', joinedAt: '2026-02-10T09:00:00Z' },
-        { id: 7, userId: 7, userName: 'George Kim', userEmail: 'george@flowdesk.io', roleInProject: 'MANAGER', joinedAt: '2026-01-25T10:30:00Z' },
+        ...MOCK_PROJECT_MEMBERS.map(m => ({ ...m, roleInProject: 'ORGANIZATION_MEMBER' })),
+        { id: 6, userId: 6, userName: 'Fiona Carter', userEmail: 'fiona@flowdesk.io', roleInProject: 'ORGANIZATION_MEMBER', joinedAt: '2026-02-10T09:00:00Z' },
+        { id: 7, userId: 7, userName: 'George Kim', userEmail: 'george@flowdesk.io', roleInProject: 'ORGANIZATION_OWNER', joinedAt: '2026-01-25T10:30:00Z' },
     ];
 };
 
@@ -53,8 +53,8 @@ export default function TeamPage() {
         m.userEmail.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const managerCount = (members || []).filter(m => m.roleInProject === 'MANAGER').length;
-    const memberCount = (members || []).filter(m => m.roleInProject === 'MEMBER').length;
+    const managerCount = (members || []).filter(m => m.roleInProject === 'ORGANIZATION_OWNER').length;
+    const memberCount = (members || []).filter(m => m.roleInProject === 'ORGANIZATION_MEMBER').length;
 
     if (isLoading) {
         return (
@@ -81,7 +81,7 @@ export default function TeamPage() {
                     <h1 className="text-3xl font-display font-bold text-white tracking-tight">Team</h1>
                     <p className="text-slate-400 mt-1">Manage your organization's members and roles</p>
                 </div>
-                <RoleGuard allowedRoles={['ADMIN', 'MANAGER']}>
+                <RoleGuard allowedRoles={['ORGANIZATION_OWNER']}>
                     <button
                         onClick={() => setIsInviteOpen(true)}
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors shadow-glow-sm hover:shadow-glow-md"
@@ -181,13 +181,13 @@ export default function TeamPage() {
 
                                     {/* Role */}
                                     <div className="col-span-3">
-                                        <RoleGuard allowedRoles={['ADMIN']}>
+                                        <RoleGuard allowedRoles={['ORGANIZATION_OWNER']}>
                                             <select
                                                 defaultValue={member.roleInProject}
                                                 className="appearance-none px-3 py-1.5 rounded-lg bg-surface-secondary border border-white/[0.08] text-xs text-slate-300 cursor-pointer hover:bg-surface-tertiary transition-colors"
                                             >
-                                                <option value="MANAGER">Manager</option>
-                                                <option value="MEMBER">Member</option>
+                                                <option value="ORGANIZATION_OWNER">Owner</option>
+                                                <option value="ORGANIZATION_MEMBER">Member</option>
                                             </select>
                                         </RoleGuard>
                                         <span className={cn('inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-medium rounded-full border', role.className)}>

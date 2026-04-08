@@ -50,7 +50,7 @@ public class AuthController {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .name(request.getName())
-                .role(com.flowdesk.enums.GlobalRole.ORGANIZATION_MEMBER)
+                .role(com.flowdesk.enums.GlobalRole.ORGANIZATION_OWNER)
                 .organization(org)
                 .build();
 

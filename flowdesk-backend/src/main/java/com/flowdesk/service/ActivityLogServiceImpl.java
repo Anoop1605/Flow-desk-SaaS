@@ -37,6 +37,11 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     }
 
     @Override
+    public java.util.List<ActivityLog> findAll() {
+        return activityLogRepository.findAll();
+    }
+
+    @Override
     public Page<ActivityLog> getLogsByOrganization(Long organizationId, Pageable pageable) {
         return activityLogRepository.findByOrganizationId(organizationId, pageable);
     }

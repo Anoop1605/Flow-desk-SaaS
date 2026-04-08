@@ -105,10 +105,18 @@ export default function ActivityLogPage() {
     queryKey: queryKeys.activity({}),
     queryFn: async () => {
       const res = await activityApi.getActivityFeed();
-      // Ensure timestamps are Date objects
+      // Map backend fields to the view model expected by the component
       return res.data.map(a => ({
-        ...a,
-        timestamp: new Date(a.timestamp)
+        id: a.id,
+        actionType: a.action, // e.g., "TASK_CREATED"
+        description: "", // The mapping will move actual description to another field if needed, but let's see
+        fullDescription: a.description,
+        actor: {
+          name: a.userName,
+          initials: a.userName ? a.userName.split(' ').map(n => n[0]).join('').toUpperCase() : '??',
+        },
+        target: a.entityType ? `${a.entityType} #${a.entityId}` : "",
+        timestamp: new Date(a.createdAt),
       }));
     }
   });
@@ -294,10 +302,7 @@ export default function ActivityLogPage() {
                                 <span className="font-semibold text-slate-100">
                                   {activity.actor.name}
                                 </span>{' '}
-                                {activity.description}{' '}
-                                <span className="font-semibold text-slate-100">
-                                  {activity.target}
-                                </span>
+                                {activity.fullDescription}
                               </p>
                             </div>
 

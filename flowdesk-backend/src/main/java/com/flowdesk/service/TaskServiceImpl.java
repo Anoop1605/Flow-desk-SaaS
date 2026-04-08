@@ -5,6 +5,7 @@ import com.flowdesk.dto.TaskCreateRequest;
 import com.flowdesk.dto.TaskResponse;
 import com.flowdesk.dto.TaskStatusUpdateRequest;
 import com.flowdesk.entity.Task;
+import com.flowdesk.repository.ProjectRepository;
 import com.flowdesk.repository.TaskRepository;
 import com.flowdesk.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -20,16 +21,23 @@ public class TaskServiceImpl implements TaskService {
 
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
+    private final ProjectRepository projectRepository;
     private final ActivityLogService activityLogService;
 
-    public TaskServiceImpl(TaskRepository taskRepository, UserRepository userRepository, ActivityLogService activityLogService) {
+    public TaskServiceImpl(TaskRepository taskRepository, UserRepository userRepository, ProjectRepository projectRepository, ActivityLogService activityLogService) {
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
+        this.projectRepository = projectRepository;
         this.activityLogService = activityLogService;
     }
 
     @Override
     public TaskResponse createTask(TaskCreateRequest request, Long organizationId, Long userId, String userName) {
+        // Validate Project
+        projectRepository.findById(request.getProjectId())
+                .filter(p -> p.getOrganization().getId().equals(organizationId))
+                .orElseThrow(() -> new RuntimeException("Project not found or doesn't belong to your organization"));
+
         Task task = new Task();
         task.setTitle(request.getTitle());
         task.setDescription(request.getDescription());

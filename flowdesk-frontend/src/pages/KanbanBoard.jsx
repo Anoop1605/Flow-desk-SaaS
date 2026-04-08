@@ -114,7 +114,7 @@ export default function KanbanBoard() {
         );
     }, [findColumn]);
 
-    // ── Persistence Mutation ──
+    // ── Persistence Mutations ──
     const updateStatusMutation = useMutation({
         mutationFn: ({ taskId, newStatus }) => taskApi.updateStatus(taskId, newStatus),
         onSuccess: () => {
@@ -122,6 +122,20 @@ export default function KanbanBoard() {
         },
         onError: (err) => {
             toast.error("Failed to update task status");
+            console.error(err);
+            // Revert local state on error
+            queryClient.invalidateQueries(queryKeys.tasks(projectId));
+        }
+    });
+
+    const createTaskMutation = useMutation({
+        mutationFn: (taskData) => taskApi.create({ ...taskData, projectId: parseInt(projectId) }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(queryKeys.tasks(projectId));
+            toast.success("Task created successfully");
+        },
+        onError: (err) => {
+            toast.error("Failed to create task");
             console.error(err);
         }
     });
@@ -151,7 +165,7 @@ export default function KanbanBoard() {
                 description: task.title
             });
         }
-    }, [findColumn, localTasks, updateStatusMutation, projectId, queryClient]);
+    }, [findColumn, localTasks, updateStatusMutation, projectId]);
 
     const dropAnimation = {
         sideEffects: defaultDropAnimationSideEffects({
@@ -191,7 +205,7 @@ export default function KanbanBoard() {
                         <LayoutGrid size={24} className="text-indigo-400" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-display font-bold text-white tracking-tight">{responseData?.projectName || 'Project Board'}</h1>
+                        <h1 className="text-2xl font-display font-bold text-white tracking-tight">{responseData?.projectName || (projectId ? `Project #${projectId}` : 'Project Board')}</h1>
                         <p className="text-sm text-slate-400 mt-1">Manage and track your tasks</p>
                     </div>
                 </div>
@@ -222,7 +236,7 @@ export default function KanbanBoard() {
                                             <TaskCard key={task.id} task={task} />
                                         ))}
 
-                                        <RoleGuard allowedRoles={['ADMIN', 'MANAGER', 'DEVELOPER']}>
+                                        <RoleGuard allowedRoles={['ORGANIZATION_OWNER', 'ORGANIZATION_MEMBER']}>
                                             <button
                                                 onClick={() => {
                                                     setModalDefaultStatus(col.id);
@@ -249,7 +263,7 @@ export default function KanbanBoard() {
             <CreateTaskModal
                 isOpen={modalOpen}
                 onClose={() => setModalOpen(false)}
-                onSubmit={(t) => setLocalTasks(p => [...p, { id: Date.now(), ...t }])}
+                onSubmit={(t) => createTaskMutation.mutate(t)}
                 defaultStatus={modalDefaultStatus}
             />
         </div>
