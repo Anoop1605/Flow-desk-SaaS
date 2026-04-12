@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -15,14 +15,14 @@ import {
     SortableContext,
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Plus, LayoutGrid, Loader2 } from 'lucide-react';
+import { Plus, LayoutGrid } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { TaskCard } from '../components/TaskCard';
 import CreateTaskModal from '../components/CreateTaskModal';
 import RoleGuard from '../components/RoleGuard';
-import { api, queryKeys, taskApi } from '../lib/api';
+import { queryKeys, taskApi } from '../lib/api';
 import { cn } from '../lib/utils';
 import { fadeUp } from '../lib/animations';
 
@@ -41,13 +41,16 @@ export default function KanbanBoard() {
     const [modalDefaultStatus, setModalDefaultStatus] = useState('TODO');
 
     // ── Fetch tasks from Spring Boot Backend ──
-    const { data: responseData, isLoading, isError } = useQuery({
+    const { data: responseData, isLoading, isError, refetch } = useQuery({
         queryKey: queryKeys.tasks(projectId),
         queryFn: async () => {
+            if (!projectId) throw new Error('Project ID is required');
             const res = await taskApi.getAll(projectId);
             return res.data;
         },
-        enabled: !!projectId
+        enabled: !!projectId,
+        staleTime: 0,
+        gcTime: 0,
     });
 
     // ── Flatten tasks for local state (Optimistic Updates) ──
@@ -55,16 +58,18 @@ export default function KanbanBoard() {
     // we flatten it to a single array for easier DnD tracking.
     const [localTasks, setLocalTasks] = useState([]);
 
-    // Sync local state when API data changes
-    useMemo(() => {
-        if (responseData?.tasks) {
-            const all = [
-                ...(responseData.tasks.TODO || []),
-                ...(responseData.tasks.IN_PROGRESS || []),
-                ...(responseData.tasks.DONE || [])
-            ];
-            setLocalTasks(all);
+    useEffect(() => {
+        if (!responseData?.tasks) {
+            setLocalTasks([]);
+            return;
         }
+
+        const all = [
+            ...(responseData.tasks.TODO || []),
+            ...(responseData.tasks.IN_PROGRESS || []),
+            ...(responseData.tasks.DONE || []),
+        ];
+        setLocalTasks(all);
     }, [responseData]);
 
     // ── Group tasks by column ──
@@ -85,7 +90,7 @@ export default function KanbanBoard() {
     );
 
     const findColumn = useCallback((id) => {
-        const task = localTasks.find(t => t.id === id);
+        const task = localTasks.find(t => String(t.id) === String(id));
         if (task) return task.status;
         if (['TODO', 'IN_PROGRESS', 'DONE'].includes(id)) return id;
         return null;
@@ -93,49 +98,56 @@ export default function KanbanBoard() {
 
     // ── Drag Handlers ──
     const handleDragStart = useCallback((event) => {
-        const task = localTasks.find(t => t.id === event.active.id);
+        const task = localTasks.find(t => String(t.id) === String(event.active.id));
         setActiveTask(task);
     }, [localTasks]);
 
     const handleDragOver = useCallback((event) => {
-        const { active, over } = event;
-        if (!over) return;
-
-        const activeId = active.id;
-        const overId = over.id;
-
-        const activeCol = findColumn(activeId);
-        const overCol = findColumn(overId);
-
-        if (!activeCol || !overCol || activeCol === overCol) return;
-
-        setLocalTasks(prev =>
-            prev.map(t => t.id === activeId ? { ...t, status: overCol } : t)
-        );
-    }, [findColumn]);
+        // Keep drag-over lightweight; we persist only on drop to avoid stale column detection.
+        if (!event.over) return;
+    }, []);
 
     // ── Persistence Mutations ──
     const updateStatusMutation = useMutation({
         mutationFn: ({ taskId, newStatus }) => taskApi.updateStatus(taskId, newStatus),
         onSuccess: () => {
-            queryClient.invalidateQueries(queryKeys.tasks(projectId));
+            queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.myTasks });
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+            queryClient.invalidateQueries({ queryKey: ['activity'] });
+            queryClient.invalidateQueries({ queryKey: ['topbar-notifications'] });
+            // Refetch to ensure UI is in sync
+            setTimeout(() => refetch(), 100);
         },
         onError: (err) => {
-            toast.error("Failed to update task status");
+            toast.error("Failed to update task status", {
+                description: err?.response?.data?.message || err?.message || 'Please try again',
+            });
             console.error(err);
-            // Revert local state on error
-            queryClient.invalidateQueries(queryKeys.tasks(projectId));
+            // Revert local state on error by refetching
+            queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
+            setTimeout(() => refetch(), 100);
         }
     });
 
     const createTaskMutation = useMutation({
-        mutationFn: (taskData) => taskApi.create({ ...taskData, projectId: parseInt(projectId) }),
+        mutationFn: (taskData) => taskApi.create({ ...taskData, projectId: parseInt(projectId, 10) }),
         onSuccess: () => {
-            queryClient.invalidateQueries(queryKeys.tasks(projectId));
+            // First invalidate the query
+            queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.myTasks });
+            queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+            queryClient.invalidateQueries({ queryKey: ['activity'] });
+            queryClient.invalidateQueries({ queryKey: ['topbar-notifications'] });
+            setModalOpen(false);
             toast.success("Task created successfully");
+            // Force immediate refetch
+            setTimeout(() => refetch(), 100);
         },
         onError: (err) => {
-            toast.error("Failed to create task");
+            toast.error("Failed to create task", {
+                description: err?.response?.data?.message || err?.message || 'Please try again',
+            });
             console.error(err);
         }
     });
@@ -145,27 +157,30 @@ export default function KanbanBoard() {
         setActiveTask(null);
         if (!over) return;
 
-        const activeId = active.id;
-        const overId = over.id;
+        const activeId = String(active.id);
+        const overId = String(over.id);
 
         const activeCol = findColumn(activeId);
         const overCol = findColumn(overId);
 
-        if (activeCol && overCol && activeCol !== overCol) {
+        // Only update if moving to a different column
+        if (activeCol && overCol && activeCol !== overCol && ['TODO', 'IN_PROGRESS', 'DONE'].includes(overCol)) {
+            const task = localTasks.find(t => String(t.id) === activeId);
+            if (!task) return;
+
             // Optimistic UI update
             setLocalTasks(prev =>
-                prev.map(t => t.id === activeId ? { ...t, status: overCol } : t)
+                prev.map(t => String(t.id) === activeId ? { ...t, status: overCol } : t)
             );
             
             // Persist to DB
             updateStatusMutation.mutate({ taskId: activeId, newStatus: overCol });
             
-            const task = localTasks.find(t => t.id === activeId);
             toast.success(`Moved to ${COLUMNS.find(c => c.id === overCol)?.title}`, {
-                description: task.title
+                description: task?.title || 'Task updated'
             });
         }
-    }, [findColumn, localTasks, updateStatusMutation, projectId]);
+    }, [findColumn, localTasks, setLocalTasks, updateStatusMutation]);
 
     const dropAnimation = {
         sideEffects: defaultDropAnimationSideEffects({
@@ -190,7 +205,7 @@ export default function KanbanBoard() {
         return (
             <div className="h-[400px] flex flex-col items-center justify-center">
                 <p className="text-rose-400 mb-4">Failed to load tasks from backend.</p>
-                <button onClick={() => queryClient.invalidateQueries(queryKeys.tasks(projectId))} className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">
+                <button onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) })} className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">
                     Try Again
                 </button>
             </div>
@@ -230,11 +245,17 @@ export default function KanbanBoard() {
                                     </span>
                                 </div>
 
-                                <SortableContext items={colTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                <SortableContext items={[col.id, ...colTasks.map(t => String(t.id))]} strategy={verticalListSortingStrategy}>
                                     <div className="flex-1 p-3 min-h-[500px] flex flex-col gap-3">
-                                        {colTasks.map((task) => (
-                                            <TaskCard key={task.id} task={task} />
-                                        ))}
+                                        {colTasks.length === 0 ? (
+                                            <div className="flex items-center justify-center py-12 text-slate-500">
+                                                <p className="text-sm">No tasks yet</p>
+                                            </div>
+                                        ) : (
+                                            colTasks.map((task) => (
+                                                <TaskCard key={task.id} task={task} />
+                                            ))
+                                        )}
 
                                         <RoleGuard allowedRoles={['ORGANIZATION_OWNER', 'ORGANIZATION_MEMBER']}>
                                             <button

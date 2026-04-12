@@ -20,8 +20,8 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import TeamPage from './pages/TeamPage';
 import MyTasksPage from './pages/MyTasksPage';
 import CreateTaskModal from './components/CreateTaskModal';
-import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { taskApi, queryKeys } from './lib/api';
+import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
+import { activityApi, taskApi, queryKeys } from './lib/api';
 import { toast } from 'sonner';
 
 function Sidebar({ isOpen, setIsOpen }) {
@@ -128,9 +128,18 @@ function Sidebar({ isOpen, setIsOpen }) {
 
 function Topbar({ setSidebarOpen }) {
   const { user } = useAuth();
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const initials = user?.name 
     ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : '??';
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['topbar-notifications'],
+    queryFn: async () => {
+      const res = await activityApi.getActivityFeed();
+      return (res.data || []).slice(0, 5);
+    },
+  });
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 border-b border-white/[0.08] bg-surface-primary/80 backdrop-blur-xl">
@@ -140,10 +149,46 @@ function Topbar({ setSidebarOpen }) {
         </button>
       </div>
       <div className="flex items-center gap-4">
-        <button className="relative w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
-          <Bell size={18} />
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 border border-surface-primary"></span>
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setIsNotificationsOpen((prev) => !prev)}
+            className="relative w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/5 hover:text-white transition-colors"
+            aria-label="Open notifications"
+          >
+            <Bell size={18} />
+            {notifications.length > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 border border-surface-primary"></span>
+            )}
+          </button>
+
+          {isNotificationsOpen && (
+            <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-white/[0.08] bg-surface-primary/95 shadow-2xl backdrop-blur-xl p-3 z-50">
+              <div className="flex items-center justify-between px-2 py-1 mb-1">
+                <p className="text-sm font-semibold text-white">Notifications</p>
+                <Link
+                  to="/activity"
+                  onClick={() => setIsNotificationsOpen(false)}
+                  className="text-xs text-indigo-300 hover:text-indigo-200"
+                >
+                  View all
+                </Link>
+              </div>
+
+              {notifications.length === 0 ? (
+                <p className="px-2 py-3 text-sm text-slate-400">No recent activity</p>
+              ) : (
+                <div className="max-h-80 overflow-auto space-y-1">
+                  {notifications.map((item) => (
+                    <div key={item.id} className="px-2 py-2 rounded-xl hover:bg-white/5 transition-colors">
+                      <p className="text-sm text-slate-200 line-clamp-2">{item.description}</p>
+                      <p className="text-xs text-slate-500 mt-1">{item.action}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <Link to="/profile" className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-sm font-medium text-white shadow-glow-sm cursor-pointer border border-white/[0.08] hover:shadow-glow-md transition-shadow">
           {initials}
         </Link>
@@ -172,10 +217,14 @@ function DashboardLayout() {
       if (!projectId) {
         throw new Error("Please select a project first.");
       }
-      return taskApi.create({ ...taskData, projectId: parseInt(projectId) });
+      return taskApi.create({ ...taskData, projectId: parseInt(projectId, 10) });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(queryKeys.tasks(projectId));
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.myTasks });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: ['activity'] });
+      queryClient.invalidateQueries({ queryKey: ['topbar-notifications'] });
       closeCreateTaskModal();
       toast.success("Task created!");
     },

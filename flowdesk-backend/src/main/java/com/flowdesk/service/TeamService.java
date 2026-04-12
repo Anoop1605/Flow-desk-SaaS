@@ -11,6 +11,11 @@ import java.util.List;
  */
 public interface TeamService {
 
+    List<TeamMemberResponse> getOrganizationMembers(Long organizationId);
+
+    TeamMemberResponse inviteMemberByEmail(String email, String role, Long organizationId, Long actorUserId,
+            String actorUserName);
+
     List<TeamMemberResponse> getProjectMembers(Long projectId);
 
     TeamMemberResponse addMemberToProject(Long projectId, Long userId, String role);

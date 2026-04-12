@@ -12,4 +12,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ActivityLogRepository extends JpaRepository<ActivityLog, Long> {
     Page<ActivityLog> findByOrganizationId(Long organizationId, Pageable pageable);
+
+    java.util.List<ActivityLog> findByOrganizationIdOrderByCreatedAtDesc(Long organizationId);
+
+    java.util.List<ActivityLog> findByOrganizationIdAndActionInOrderByCreatedAtDesc(Long organizationId,
+            java.util.List<String> actions);
 }

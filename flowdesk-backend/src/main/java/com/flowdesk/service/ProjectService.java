@@ -14,11 +14,14 @@ public interface ProjectService {
 
     List<ProjectResponse> getAllProjects(Long organizationId);
 
+    List<ProjectResponse> getAllProjects(Long organizationId, String status);
+
     ProjectResponse getProjectById(Long id, Long organizationId);
 
     ProjectResponse createProject(ProjectCreateRequest request, Long organizationId, Long userId, String userName);
 
-    ProjectResponse updateProject(Long id, ProjectCreateRequest request, Long organizationId, Long userId, String userName);
+    ProjectResponse updateProject(Long id, ProjectCreateRequest request, Long organizationId, Long userId,
+            String userName);
 
     void deleteProject(Long id, Long organizationId, Long userId, String userName);
 }

@@ -1,17 +1,15 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import {
-    CheckSquare, Search, Filter, CalendarClock, AlertCircle,
+    CheckSquare, Search, CalendarClock, AlertCircle,
     CircleDot, CheckCircle2, Clock, ListTodo
 } from 'lucide-react';
 import { fadeUp, staggerContainer, cardVariant } from '../lib/animations';
 import { cn } from '../lib/utils';
-import { MOCK_TASKS } from '../data/mockData';
+import { queryKeys, taskApi } from '../lib/api';
 import { useUIStore } from '../stores/uiStore';
 import { formatDistanceToNow, isPast } from 'date-fns';
-
-// Phase 1: Simulate "my" tasks — tasks assigned to the current user (Alice Johnson, id: 1)
-const CURRENT_USER_ID = 1;
 
 const STATUS_TABS = [
     { id: 'ALL', label: 'All Tasks', icon: ListTodo },
@@ -37,10 +35,13 @@ export default function MyTasksPage() {
     const [activeTab, setActiveTab] = useState('ALL');
     const openTask = useUIStore(s => s.openTask);
 
-    // Phase 1: Fetch "my" tasks from mock data
-    const myTasks = useMemo(() => {
-        return MOCK_TASKS.filter(t => t.assignee?.id === CURRENT_USER_ID);
-    }, []);
+    const { data: myTasks = [], isLoading } = useQuery({
+        queryKey: queryKeys.myTasks,
+        queryFn: async () => {
+            const res = await taskApi.getMine();
+            return res.data;
+        },
+    });
 
     // Apply filters
     const filtered = useMemo(() => {
@@ -60,6 +61,20 @@ export default function MyTasksPage() {
         done: myTasks.filter(t => t.status === 'DONE').length,
         overdue: myTasks.filter(t => t.dueDate && isPast(new Date(t.dueDate)) && t.status !== 'DONE').length,
     }), [myTasks]);
+
+    if (isLoading) {
+        return (
+            <div className="space-y-8 max-w-5xl mx-auto">
+                <div className="skeleton h-10 w-48 rounded-lg" />
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map(i => <div key={i} className="skeleton h-24 rounded-2xl" />)}
+                </div>
+                <div className="space-y-3">
+                    {[1, 2, 3].map(i => <div key={i} className="skeleton h-20 rounded-2xl" />)}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <motion.div
@@ -195,7 +210,7 @@ export default function MyTasksPage() {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-3 text-xs text-slate-500">
-                                        <span className="truncate">{task.projectName}</span>
+                                        <span className="truncate">{task.projectName || `Project #${task.projectId}`}</span>
                                         <span className="text-slate-600">•</span>
                                         <span className="flex items-center gap-1">
                                             <CalendarClock size={11} className={isOverdue ? "text-rose-400" : ""} />

@@ -24,7 +24,8 @@ public class TaskServiceImpl implements TaskService {
     private final ProjectRepository projectRepository;
     private final ActivityLogService activityLogService;
 
-    public TaskServiceImpl(TaskRepository taskRepository, UserRepository userRepository, ProjectRepository projectRepository, ActivityLogService activityLogService) {
+    public TaskServiceImpl(TaskRepository taskRepository, UserRepository userRepository,
+            ProjectRepository projectRepository, ActivityLogService activityLogService) {
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
         this.projectRepository = projectRepository;
@@ -41,15 +42,17 @@ public class TaskServiceImpl implements TaskService {
         Task task = new Task();
         task.setTitle(request.getTitle());
         task.setDescription(request.getDescription());
-        
-        String statusStr = request.getStatus() != null ? request.getStatus() : "TODO";
+
+        String statusStr = (request.getStatus() == null || request.getStatus().isBlank())
+                ? "TODO"
+                : request.getStatus().toUpperCase();
         task.setStatus(com.flowdesk.enums.TaskStatus.valueOf(statusStr));
-        
-        task.setPriority(com.flowdesk.enums.Priority.valueOf(request.getPriority()));
+
+        task.setPriority(com.flowdesk.enums.Priority.valueOf(request.getPriority().toUpperCase()));
         task.setProjectId(request.getProjectId());
-        task.setAssigneeId(request.getAssigneeId());
+        task.setAssigneeId(request.getAssigneeId() != null ? request.getAssigneeId() : userId);
         task.setDueDate(request.getDueDate());
-        
+
         com.flowdesk.entity.Organization org = new com.flowdesk.entity.Organization();
         org.setId(organizationId);
         task.setOrganization(org);
@@ -57,8 +60,8 @@ public class TaskServiceImpl implements TaskService {
         Task saved = taskRepository.save(task);
 
         // Log Activity
-        activityLogService.log("CREATED_TASK", 
-                userName + " created task: " + task.getTitle(), 
+        activityLogService.log("TASK_CREATED",
+                userName + " created task: " + task.getTitle(),
                 userId, userName, organizationId, saved.getId(), "TASK");
 
         return mapToResponse(saved);
@@ -95,12 +98,12 @@ public class TaskServiceImpl implements TaskService {
 
         task.setTitle(request.getTitle());
         task.setDescription(request.getDescription());
-        
+
         if (request.getStatus() != null) {
-            task.setStatus(com.flowdesk.enums.TaskStatus.valueOf(request.getStatus()));
+            task.setStatus(com.flowdesk.enums.TaskStatus.valueOf(request.getStatus().toUpperCase()));
         }
-        
-        task.setPriority(com.flowdesk.enums.Priority.valueOf(request.getPriority()));
+
+        task.setPriority(com.flowdesk.enums.Priority.valueOf(request.getPriority().toUpperCase()));
         task.setAssigneeId(request.getAssigneeId());
         task.setDueDate(request.getDueDate());
 
@@ -109,18 +112,19 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public TaskResponse updateTaskStatus(Long id, TaskStatusUpdateRequest request, Long organizationId, Long userId, String userName) {
+    public TaskResponse updateTaskStatus(Long id, TaskStatusUpdateRequest request, Long organizationId, Long userId,
+            String userName) {
         Task task = taskRepository.findById(id)
                 .filter(t -> t.getOrganization().getId().equals(organizationId))
                 .orElseThrow(() -> new RuntimeException("Task not found"));
 
         com.flowdesk.enums.TaskStatus oldStatus = task.getStatus();
-        task.setStatus(com.flowdesk.enums.TaskStatus.valueOf(request.getStatus()));
+        task.setStatus(com.flowdesk.enums.TaskStatus.valueOf(request.getStatus().toUpperCase()));
         Task saved = taskRepository.save(task);
 
         // Log Activity
-        activityLogService.log("UPDATED_TASK_STATUS", 
-                userName + " moved task '" + task.getTitle() + "' from " + oldStatus + " to " + saved.getStatus(), 
+        activityLogService.log("TASK_UPDATED",
+                userName + " moved task '" + task.getTitle() + "' from " + oldStatus + " to " + saved.getStatus(),
                 userId, userName, organizationId, saved.getId(), "TASK");
 
         return mapToResponse(saved);
@@ -131,13 +135,13 @@ public class TaskServiceImpl implements TaskService {
         Task task = taskRepository.findById(id)
                 .filter(t -> t.getOrganization().getId().equals(organizationId))
                 .orElseThrow(() -> new RuntimeException("Task not found"));
-        
+
         String taskTitle = task.getTitle();
         taskRepository.delete(task);
 
         // Log Activity
-        activityLogService.log("DELETED_TASK", 
-                userName + " deleted task: " + taskTitle, 
+        activityLogService.log("TASK_DELETED",
+                userName + " deleted task: " + taskTitle,
                 userId, userName, organizationId, id, "TASK");
     }
 
@@ -149,13 +153,13 @@ public class TaskServiceImpl implements TaskService {
         response.setStatus(task.getStatus().name());
         response.setPriority(task.getPriority().name());
         response.setProjectId(task.getProjectId());
-        
+
         if (task.getAssigneeId() != null) {
             userRepository.findById(task.getAssigneeId()).ifPresent(user -> {
                 response.setAssignee(new AssigneeDTO(user.getId(), user.getName()));
             });
         }
-        
+
         response.setDueDate(task.getDueDate());
         response.setCreatedAt(task.getCreatedAt());
         response.setUpdatedAt(task.getUpdatedAt());

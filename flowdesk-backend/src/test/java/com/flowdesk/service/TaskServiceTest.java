@@ -7,6 +7,8 @@ import com.flowdesk.entity.Organization;
 import com.flowdesk.entity.Task;
 import com.flowdesk.enums.Priority;
 import com.flowdesk.enums.TaskStatus;
+import com.flowdesk.entity.Project;
+import com.flowdesk.repository.ProjectRepository;
 import com.flowdesk.repository.TaskRepository;
 import com.flowdesk.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.ArgumentCaptor;
 
 import java.util.Optional;
 
@@ -30,6 +33,9 @@ class TaskServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private ProjectRepository projectRepository;
+
+    @Mock
     private ActivityLogService activityLogService;
 
     @InjectMocks
@@ -44,7 +50,8 @@ class TaskServiceTest {
     void testCreateTask() {
         TaskCreateRequest request = new TaskCreateRequest();
         request.setTitle("New Task");
-        request.setPriority("HIGH");
+        request.setPriority("high");
+        request.setStatus("todo");
         request.setProjectId(1L);
 
         Task savedTask = new Task();
@@ -52,10 +59,15 @@ class TaskServiceTest {
         savedTask.setTitle("New Task");
         savedTask.setStatus(TaskStatus.TODO);
         savedTask.setPriority(Priority.HIGH);
+
+        Project project = new Project();
         Organization org = new Organization();
         org.setId(1L);
+        project.setOrganization(org);
+
         savedTask.setOrganization(org);
 
+        when(projectRepository.findById(1L)).thenReturn(Optional.of(project));
         when(taskRepository.save(any(Task.class))).thenReturn(savedTask);
 
         TaskResponse response = taskService.createTask(request, 1L, 1L, "Admin");
@@ -63,7 +75,13 @@ class TaskServiceTest {
         assertNotNull(response);
         assertEquals(100L, response.getId());
         assertEquals("New Task", response.getTitle());
-        verify(activityLogService, times(1)).log(anyString(), anyString(), anyLong(), anyString(), anyLong(), anyLong(), anyString());
+        ArgumentCaptor<Task> savedTaskCaptor = ArgumentCaptor.forClass(Task.class);
+        verify(taskRepository).save(savedTaskCaptor.capture());
+        assertEquals(1L, savedTaskCaptor.getValue().getAssigneeId());
+        assertEquals(TaskStatus.TODO, savedTaskCaptor.getValue().getStatus());
+        assertEquals(Priority.HIGH, savedTaskCaptor.getValue().getPriority());
+        verify(activityLogService, times(1)).log(anyString(), anyString(), anyLong(), anyString(), anyLong(), anyLong(),
+                anyString());
     }
 
     @Test
@@ -86,9 +104,8 @@ class TaskServiceTest {
         when(taskRepository.save(any(Task.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // Attempt update with WRONG orgId
-        assertThrows(RuntimeException.class, () -> 
-            taskService.updateTaskStatus(taskId, updateRequest, otherOrgId, 1L, "Admin")
-        );
+        assertThrows(RuntimeException.class,
+                () -> taskService.updateTaskStatus(taskId, updateRequest, otherOrgId, 1L, "Admin"));
 
         // Attempt update with RIGHT orgId
         TaskResponse response = taskService.updateTaskStatus(taskId, updateRequest, orgId, 1L, "Admin");

@@ -57,6 +57,8 @@ export const authApi = {
     register: (data) => api.post('/api/auth/register', data),
     login: (data) => api.post('/api/auth/login', data),
     me: () => api.get('/api/auth/me'),
+    updateProfile: (data) => api.put('/api/auth/me', data),
+    changePassword: (data) => api.put('/api/auth/me/password', data),
     logout: () => api.post('/api/auth/logout'),
 };
 export const activityApi = {
@@ -65,7 +67,7 @@ export const activityApi = {
 
 // 5b. PROJECT API HELPERS — Member 2
 export const projectApi = {
-    getAll: () => api.get('/api/projects'),
+    getAll: (params) => api.get('/api/projects', { params }),
     getById: (id) => api.get(`/api/projects/${id}`),
     create: (data) => api.post('/api/projects', data),
     update: (id, data) => api.put(`/api/projects/${id}`, data),
@@ -79,11 +81,17 @@ export const projectApi = {
 // 5c. TASK API HELPERS — Member 3
 export const taskApi = {
     getAll: (projectId) => api.get('/api/tasks', { params: { projectId } }),
+    getMine: () => api.get('/api/tasks/my'),
     getById: (id) => api.get(`/api/tasks/${id}`),
     create: (data) => api.post('/api/tasks', data),
     update: (id, data) => api.put(`/api/tasks/${id}`, data),
     updateStatus: (id, status) => api.patch(`/api/tasks/${id}/status`, { status }),
     delete: (id) => api.delete(`/api/tasks/${id}`),
+};
+
+export const teamApi = {
+    getMembers: () => api.get('/api/team/members'),
+    invite: (data) => api.post('/api/team/invite', data),
 };
 // 5. QUERY KEYS — Centralized for TanStack Query
 // WHY: Every useQuery call needs a key. Defining them here means

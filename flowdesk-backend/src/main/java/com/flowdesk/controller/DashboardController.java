@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/dashboard")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(originPatterns = { "http://localhost:*", "http://127.0.0.1:*" })
 public class DashboardController {
 
     private final ProjectRepository projectRepository;

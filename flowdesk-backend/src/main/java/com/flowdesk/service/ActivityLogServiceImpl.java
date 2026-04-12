@@ -19,7 +19,8 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     private final ActivityLogRepository activityLogRepository;
 
     @Override
-    public void log(String action, String description, Long userId, String userName, Long organizationId, Long entityId, String entityType) {
+    public void log(String action, String description, Long userId, String userName, Long organizationId, Long entityId,
+            String entityType) {
         Organization org = new Organization();
         org.setId(organizationId);
 
@@ -39,6 +40,17 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     @Override
     public java.util.List<ActivityLog> findAll() {
         return activityLogRepository.findAll();
+    }
+
+    @Override
+    public java.util.List<ActivityLog> findByOrganization(Long organizationId) {
+        return activityLogRepository.findByOrganizationIdOrderByCreatedAtDesc(organizationId);
+    }
+
+    @Override
+    public java.util.List<ActivityLog> findByOrganizationAndActions(Long organizationId,
+            java.util.List<String> actions) {
+        return activityLogRepository.findByOrganizationIdAndActionInOrderByCreatedAtDesc(organizationId, actions);
     }
 
     @Override

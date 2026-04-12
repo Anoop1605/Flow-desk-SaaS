@@ -17,7 +17,8 @@ function TaskCardComponent({ task, overlay = false }) {
         transition,
         isDragging,
     } = useSortable({
-        id: task.id,
+        id: String(task.id),
+        disabled: overlay,
         data: {
             type: 'Task',
             task,
@@ -38,14 +39,17 @@ function TaskCardComponent({ task, overlay = false }) {
             ref={setNodeRef}
             style={style}
             className={cn(
-                "group relative bg-surface-primary/60 hover:bg-surface-primary backdrop-blur-md rounded-xl border border-white/[0.06] p-4 transition-colors cursor-grab active:cursor-grabbing",
+                "group relative bg-surface-primary/60 hover:bg-surface-primary backdrop-blur-md rounded-xl border border-white/[0.06] p-4 transition-colors",
+                overlay ? "cursor-default" : "cursor-grab active:cursor-grabbing",
                 isDragging ? "opacity-30" : "opacity-100",
                 overlay ? "shadow-glow-md rotate-2 scale-105 border-indigo-500/30 bg-surface-primary" : "shadow-sm"
             )}
             {...attributes}
             {...listeners}
         >
-            <div className="absolute inset-0 z-0" onClick={() => !isDragging && openTask(task.id)} />
+            {!overlay && (
+                <div className="absolute inset-0 z-0" onClick={() => !isDragging && openTask(task.id)} />
+            )}
             <div className="relative z-10 flex items-start justify-between gap-3 mb-3">
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">

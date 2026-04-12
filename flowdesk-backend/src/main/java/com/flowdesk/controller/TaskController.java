@@ -20,7 +20,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/tasks")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(originPatterns = { "http://localhost:*", "http://127.0.0.1:*" })
 public class TaskController {
 
     private final TaskService taskService;
@@ -53,6 +53,14 @@ public class TaskController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/my")
+    public ResponseEntity<List<TaskResponse>> getMyTasks(Authentication authentication) {
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Long orgId = userDetails.getUser().getOrganization().getId();
+        Long userId = userDetails.getUser().getId();
+        return ResponseEntity.ok(taskService.getTasksByAssigneeId(userId, orgId));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<TaskResponse> getTaskById(@PathVariable Long id, Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
@@ -61,24 +69,29 @@ public class TaskController {
     }
 
     @PostMapping
-    public ResponseEntity<TaskResponse> createTask(@RequestBody com.flowdesk.dto.TaskCreateRequest request, Authentication authentication) {
+    public ResponseEntity<TaskResponse> createTask(@RequestBody com.flowdesk.dto.TaskCreateRequest request,
+            Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         Long orgId = userDetails.getUser().getOrganization().getId();
-        return ResponseEntity.ok(taskService.createTask(request, orgId, userDetails.getUser().getId(), userDetails.getUser().getName()));
+        return ResponseEntity.ok(
+                taskService.createTask(request, orgId, userDetails.getUser().getId(), userDetails.getUser().getName()));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TaskResponse> updateTask(@PathVariable Long id, @RequestBody com.flowdesk.dto.TaskCreateRequest request, Authentication authentication) {
+    public ResponseEntity<TaskResponse> updateTask(@PathVariable Long id,
+            @RequestBody com.flowdesk.dto.TaskCreateRequest request, Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         Long orgId = userDetails.getUser().getOrganization().getId();
         return ResponseEntity.ok(taskService.updateTask(id, request, orgId));
     }
 
     @PatchMapping("/{id}/status")
-    public ResponseEntity<TaskResponse> updateTaskStatus(@PathVariable Long id, @RequestBody com.flowdesk.dto.TaskStatusUpdateRequest request, Authentication authentication) {
+    public ResponseEntity<TaskResponse> updateTaskStatus(@PathVariable Long id,
+            @RequestBody com.flowdesk.dto.TaskStatusUpdateRequest request, Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         Long orgId = userDetails.getUser().getOrganization().getId();
-        return ResponseEntity.ok(taskService.updateTaskStatus(id, request, orgId, userDetails.getUser().getId(), userDetails.getUser().getName()));
+        return ResponseEntity.ok(taskService.updateTaskStatus(id, request, orgId, userDetails.getUser().getId(),
+                userDetails.getUser().getName()));
     }
 
     @DeleteMapping("/{id}")

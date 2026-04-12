@@ -25,7 +25,20 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     public List<ProjectResponse> getAllProjects(Long organizationId) {
-        return projectRepository.findByOrganizationId(organizationId).stream()
+        return getAllProjects(organizationId, null);
+    }
+
+    @Override
+    public List<ProjectResponse> getAllProjects(Long organizationId, String status) {
+        if (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status)) {
+            return projectRepository.findByOrganizationId(organizationId).stream()
+                    .map(this::mapToResponse)
+                    .toList();
+        }
+
+        com.flowdesk.enums.ProjectStatus parsedStatus = com.flowdesk.enums.ProjectStatus.valueOf(status.toUpperCase());
+
+        return projectRepository.findByOrganizationIdAndStatus(organizationId, parsedStatus).stream()
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -39,42 +52,50 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public ProjectResponse createProject(ProjectCreateRequest request, Long organizationId, Long userId, String userName) {
+    public ProjectResponse createProject(ProjectCreateRequest request, Long organizationId, Long userId,
+            String userName) {
         Project project = new Project();
         project.setName(request.getName());
         project.setDescription(request.getDescription());
         project.setColorTag(request.getColorTag());
         project.setOwnerId(userId);
-        
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            project.setStatus(com.flowdesk.enums.ProjectStatus.valueOf(request.getStatus().toUpperCase()));
+        }
+
         com.flowdesk.entity.Organization org = new com.flowdesk.entity.Organization();
         org.setId(organizationId);
         project.setOrganization(org);
-        
+
         Project saved = projectRepository.save(project);
 
         // Log Activity
-        activityLogService.log("CREATED_PROJECT", 
-                userName + " created project: " + project.getName(), 
+        activityLogService.log("PROJECT_CREATED",
+                userName + " created project: " + project.getName(),
                 userId, userName, organizationId, saved.getId(), "PROJECT");
 
         return mapToResponse(saved);
     }
 
     @Override
-    public ProjectResponse updateProject(Long id, ProjectCreateRequest request, Long organizationId, Long userId, String userName) {
+    public ProjectResponse updateProject(Long id, ProjectCreateRequest request, Long organizationId, Long userId,
+            String userName) {
         Project project = projectRepository.findById(id)
                 .filter(p -> p.getOrganization().getId().equals(organizationId))
                 .orElseThrow(() -> new RuntimeException("Project not found"));
-        
+
         project.setName(request.getName());
         project.setDescription(request.getDescription());
         project.setColorTag(request.getColorTag());
-        
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            project.setStatus(com.flowdesk.enums.ProjectStatus.valueOf(request.getStatus().toUpperCase()));
+        }
+
         Project saved = projectRepository.save(project);
 
         // Log Activity
-        activityLogService.log("UPDATED_PROJECT", 
-                userName + " updated project: " + project.getName(), 
+        activityLogService.log("PROJECT_UPDATED",
+                userName + " updated project: " + project.getName(),
                 userId, userName, organizationId, saved.getId(), "PROJECT");
 
         return mapToResponse(saved);
@@ -85,13 +106,13 @@ public class ProjectServiceImpl implements ProjectService {
         Project project = projectRepository.findById(id)
                 .filter(p -> p.getOrganization().getId().equals(organizationId))
                 .orElseThrow(() -> new RuntimeException("Project not found"));
-        
+
         String projectName = project.getName();
         projectRepository.delete(project);
 
         // Log Activity
-        activityLogService.log("DELETED_PROJECT", 
-                userName + " deleted project: " + projectName, 
+        activityLogService.log("PROJECT_DELETED",
+                userName + " deleted project: " + projectName,
                 userId, userName, organizationId, id, "PROJECT");
     }
 

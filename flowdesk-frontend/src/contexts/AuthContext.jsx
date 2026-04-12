@@ -17,10 +17,58 @@ const AuthContext = createContext(null);
 // 2. Provider component — wraps the whole app (added in App.jsx)
 export function AuthProvider({ children }) {
   const { token, user, setAuth, clearAuth } = useAuthStore();
+  const [isHydrated, setIsHydrated] = useState(() => {
+    const persistApi = useAuthStore.persist;
+    return persistApi?.hasHydrated ? persistApi.hasHydrated() : true;
+  });
 
   // isLoading = true while we're checking if a stored token is still valid
   // This prevents a flash of the login page on refresh when user IS logged in
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const persistApi = useAuthStore.persist;
+    if (!persistApi?.onFinishHydration) {
+      setIsHydrated(true);
+      return undefined;
+    }
+
+    if (persistApi.hasHydrated()) {
+      setIsHydrated(true);
+    }
+
+    const unsubscribe = persistApi.onFinishHydration(() => {
+      setIsHydrated(true);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Restore session from token on app load
+  useEffect(() => {
+    if (!isHydrated) {
+      setIsLoading(true);
+      return;
+    }
+
+    if (token && !user) {
+      // Token exists but user info is missing, try to fetch user data
+      const restoreSession = async () => {
+        try {
+          const res = await api.get('/api/auth/me');
+          setAuth(token, res.data);
+        } catch (err) {
+          console.warn('Session restoration failed:', err);
+          clearAuth();
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      restoreSession();
+    } else {
+      setIsLoading(false);
+    }
+  }, [token, user, isHydrated, setAuth, clearAuth]);
 
   // login() — called by the Login page form submit
   // Takes email + password, hits the backend, stores the result

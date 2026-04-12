@@ -22,12 +22,6 @@ const statusConfig = {
 
 import { toast } from 'sonner';
 
-// Fetch from real backend
-const fetchProjects = async () => {
-    const res = await projectApi.getAll();
-    return res.data;
-};
-
 function ProjectCard({ project }) {
     const status = statusConfig[project.status] || statusConfig.ACTIVE;
 
@@ -101,14 +95,19 @@ export default function ProjectsListPage() {
     const queryClient = useQueryClient();
 
     const { data: projects, isLoading } = useQuery({
-        queryKey: queryKeys.projects,
-        queryFn: fetchProjects,
+        queryKey: [...queryKeys.projects, statusFilter],
+        queryFn: async () => {
+            const params = statusFilter !== 'ALL' ? { status: statusFilter } : {};
+            const res = await projectApi.getAll(params);
+            return res.data;
+        },
+        staleTime: 1000 * 60 * 5, // 5 minutes
     });
 
     const createProjectMutation = useMutation({
         mutationFn: (data) => projectApi.create(data),
         onSuccess: () => {
-            queryClient.invalidateQueries(queryKeys.projects);
+            queryClient.invalidateQueries({ queryKey: queryKeys.projects });
             toast.success('Project created successfully!');
         },
         onError: (err) => {
@@ -121,8 +120,7 @@ export default function ProjectsListPage() {
     const filtered = (projects || []).filter((p) => {
         const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             p.description.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === 'ALL' || p.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        return matchesSearch;
     });
 
     if (isLoading) {

@@ -20,17 +20,19 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/projects")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(originPatterns = { "http://localhost:*", "http://127.0.0.1:*" })
 public class ProjectController {
 
     private final ProjectService projectService;
     private final TeamService teamService;
 
     @GetMapping
-    public ResponseEntity<List<ProjectResponse>> getAllProjects(Authentication authentication) {
+    public ResponseEntity<List<ProjectResponse>> getAllProjects(
+            Authentication authentication,
+            @RequestParam(name = "status", required = false) String status) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         Long orgId = userDetails.getUser().getOrganization().getId();
-        return ResponseEntity.ok(projectService.getAllProjects(orgId));
+        return ResponseEntity.ok(projectService.getAllProjects(orgId, status));
     }
 
     @GetMapping("/{id}")
@@ -41,17 +43,21 @@ public class ProjectController {
     }
 
     @PostMapping
-    public ResponseEntity<ProjectResponse> createProject(@RequestBody ProjectCreateRequest request, Authentication authentication) {
+    public ResponseEntity<ProjectResponse> createProject(@RequestBody ProjectCreateRequest request,
+            Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         Long orgId = userDetails.getUser().getOrganization().getId();
-        return ResponseEntity.ok(projectService.createProject(request, orgId, userDetails.getUser().getId(), userDetails.getUser().getName()));
+        return ResponseEntity.ok(projectService.createProject(request, orgId, userDetails.getUser().getId(),
+                userDetails.getUser().getName()));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ProjectResponse> updateProject(@PathVariable Long id, @RequestBody ProjectCreateRequest request, Authentication authentication) {
+    public ResponseEntity<ProjectResponse> updateProject(@PathVariable Long id,
+            @RequestBody ProjectCreateRequest request, Authentication authentication) {
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         Long orgId = userDetails.getUser().getOrganization().getId();
-        return ResponseEntity.ok(projectService.updateProject(id, request, orgId, userDetails.getUser().getId(), userDetails.getUser().getName()));
+        return ResponseEntity.ok(projectService.updateProject(id, request, orgId, userDetails.getUser().getId(),
+                userDetails.getUser().getName()));
     }
 
     @DeleteMapping("/{id}")
@@ -64,7 +70,30 @@ public class ProjectController {
 
     @GetMapping("/{id}/members")
     public ResponseEntity<List<TeamMemberResponse>> getProjectMembers(@PathVariable Long id) {
-        // Phase 4: Implement with TeamService
         return ResponseEntity.ok(teamService.getProjectMembers(id));
+    }
+
+    @PostMapping("/{id}/members")
+    public ResponseEntity<TeamMemberResponse> addProjectMember(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> payload) {
+        Long userId = Long.valueOf(payload.get("userId"));
+        String role = payload.getOrDefault("role", "MEMBER");
+        return ResponseEntity.ok(teamService.addMemberToProject(id, userId, role));
+    }
+
+    @PutMapping("/{id}/members/{userId}")
+    public ResponseEntity<TeamMemberResponse> updateProjectMemberRole(
+            @PathVariable Long id,
+            @PathVariable Long userId,
+            @RequestBody java.util.Map<String, String> payload) {
+        String role = payload.getOrDefault("role", "MEMBER");
+        return ResponseEntity.ok(teamService.changeMemberRole(id, userId, role));
+    }
+
+    @DeleteMapping("/{id}/members/{userId}")
+    public ResponseEntity<Void> removeProjectMember(@PathVariable Long id, @PathVariable Long userId) {
+        teamService.removeMemberFromProject(id, userId);
+        return ResponseEntity.noContent().build();
     }
 }

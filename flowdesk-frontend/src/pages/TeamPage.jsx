@@ -1,13 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import {
     Search, UserPlus, Users, Shield, Mail, MoreHorizontal, Crown
 } from 'lucide-react';
-import { queryKeys } from '../lib/api';
+import { teamApi } from '../lib/api';
 import { fadeUp, staggerContainer } from '../lib/animations';
 import { cn } from '../lib/utils';
-import { MOCK_PROJECT_MEMBERS } from '../data/mockData';
 import InviteMemberModal from '../components/InviteMemberModal';
 import RoleGuard from '../components/RoleGuard';
 import { formatDistanceToNow } from 'date-fns';
@@ -15,17 +14,6 @@ import { formatDistanceToNow } from 'date-fns';
 const roleConfig = {
     ORGANIZATION_OWNER: { label: 'Owner', className: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30', icon: Crown },
     ORGANIZATION_MEMBER: { label: 'Member', className: 'bg-slate-500/15 text-slate-300 border-slate-500/30', icon: Users },
-};
-
-// Phase 1: mock fetch for all org members
-const fetchTeamMembers = async () => {
-    await new Promise((r) => setTimeout(r, 500));
-    // Simulate org-wide members (combine with distinct roles)
-    return [
-        ...MOCK_PROJECT_MEMBERS.map(m => ({ ...m, roleInProject: 'ORGANIZATION_MEMBER' })),
-        { id: 6, userId: 6, userName: 'Fiona Carter', userEmail: 'fiona@flowdesk.io', roleInProject: 'ORGANIZATION_MEMBER', joinedAt: '2026-02-10T09:00:00Z' },
-        { id: 7, userId: 7, userName: 'George Kim', userEmail: 'george@flowdesk.io', roleInProject: 'ORGANIZATION_OWNER', joinedAt: '2026-01-25T10:30:00Z' },
-    ];
 };
 
 // Pretty avatar colors per user
@@ -42,10 +30,23 @@ const avatarColors = [
 export default function TeamPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isInviteOpen, setIsInviteOpen] = useState(false);
+    const queryClient = useQueryClient();
 
     const { data: members, isLoading } = useQuery({
         queryKey: ['team-members'],
-        queryFn: fetchTeamMembers,
+        queryFn: async () => {
+            const res = await teamApi.getMembers();
+            return res.data;
+        },
+    });
+
+    const inviteMutation = useMutation({
+        mutationFn: (payload) => teamApi.invite(payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['team-members'] });
+            queryClient.invalidateQueries({ queryKey: ['activity'] });
+            queryClient.invalidateQueries({ queryKey: ['topbar-notifications'] });
+        },
     });
 
     const filtered = (members || []).filter((m) =>
@@ -156,7 +157,7 @@ export default function TeamPage() {
                         </div>
                     ) : (
                         filtered.map((member, idx) => {
-                            const role = roleConfig[member.roleInProject] || roleConfig.MEMBER;
+                            const role = roleConfig[member.roleInProject] || roleConfig.ORGANIZATION_MEMBER;
                             return (
                                 <div
                                     key={member.id}
@@ -215,7 +216,11 @@ export default function TeamPage() {
             </motion.div>
 
             {/* Invite Member Modal */}
-            <InviteMemberModal open={isInviteOpen} onOpenChange={setIsInviteOpen} />
+            <InviteMemberModal
+                open={isInviteOpen}
+                onOpenChange={setIsInviteOpen}
+                onSubmit={(payload) => inviteMutation.mutateAsync(payload)}
+            />
         </motion.div>
     );
 }
