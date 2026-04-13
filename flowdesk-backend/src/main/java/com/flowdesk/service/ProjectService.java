@@ -12,13 +12,16 @@ import java.util.List;
  */
 public interface ProjectService {
 
-    List<ProjectResponse> getAllProjects(Long tenantId);
+    List<ProjectResponse> getAllProjects(Long organizationId);
 
-    ProjectResponse getProjectById(Long id);
+    List<ProjectResponse> getAllProjects(Long organizationId, String status);
 
-    ProjectResponse createProject(ProjectCreateRequest request, Long tenantId, Long ownerId);
+    ProjectResponse getProjectById(Long id, Long organizationId);
 
-    ProjectResponse updateProject(Long id, ProjectCreateRequest request);
+    ProjectResponse createProject(ProjectCreateRequest request, Long organizationId, Long userId, String userName);
 
-    void deleteProject(Long id);
+    ProjectResponse updateProject(Long id, ProjectCreateRequest request, Long organizationId, Long userId,
+            String userName);
+
+    void deleteProject(Long id, Long organizationId, Long userId, String userName);
 }

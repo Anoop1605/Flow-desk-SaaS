@@ -37,20 +37,13 @@ export default function CreateTaskModal({ isOpen, onClose, onSubmit, defaultStat
     }, [isOpen, defaultStatus, reset]);
 
     const handleFormSubmit = async (data) => {
-        // STUB: Simulate API POST delay
-        await new Promise(r => setTimeout(r, 600));
-
-        // STUB: Create mock response shape matching backend DTO
-        const newTask = {
-            id: Date.now(),
-            ...data,
-            dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
-            createdAt: new Date().toISOString(),
-            assignee: data.assigneeId ? { id: data.assigneeId, name: 'Team Member' } : null
-        };
-
-        onSubmit(newTask);
-        onClose();
+        try {
+            await onSubmit(data);
+            // reset() and onClose() should be handled by the parent or here on success
+            // In our case, App.jsx handles closing on success.
+        } catch (err) {
+            // Error handling is handled by the parent mutation/toast
+        }
     };
 
     return (

@@ -17,35 +17,90 @@ const AuthContext = createContext(null);
 // 2. Provider component — wraps the whole app (added in App.jsx)
 export function AuthProvider({ children }) {
   const { token, user, setAuth, clearAuth } = useAuthStore();
+  const [isHydrated, setIsHydrated] = useState(() => {
+    const persistApi = useAuthStore.persist;
+    return persistApi?.hasHydrated ? persistApi.hasHydrated() : true;
+  });
 
   // isLoading = true while we're checking if a stored token is still valid
   // This prevents a flash of the login page on refresh when user IS logged in
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const persistApi = useAuthStore.persist;
+    if (!persistApi?.onFinishHydration) {
+      setIsHydrated(true);
+      return undefined;
+    }
+
+    if (persistApi.hasHydrated()) {
+      setIsHydrated(true);
+    }
+
+    const unsubscribe = persistApi.onFinishHydration(() => {
+      setIsHydrated(true);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Restore session from token on app load
+  useEffect(() => {
+    if (!isHydrated) {
+      setIsLoading(true);
+      return;
+    }
+
+    if (token && !user) {
+      // Token exists but user info is missing, try to fetch user data
+      const restoreSession = async () => {
+        try {
+          const res = await api.get('/api/auth/me');
+          setAuth(token, res.data);
+        } catch (err) {
+          console.warn('Session restoration failed:', err);
+          clearAuth();
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      restoreSession();
+    } else {
+      setIsLoading(false);
+    }
+  }, [token, user, isHydrated, setAuth, clearAuth]);
 
   // login() — called by the Login page form submit
   // Takes email + password, hits the backend, stores the result
   const login = useCallback(async (email, password) => {
-    // Phase 1: Simulate a successful login with mock data
-    // Phase 2: Replace with → const res = await api.post('/api/auth/login', { email, password });
-    await new Promise((r) => setTimeout(r, 800)); // simulate network delay
+    try {
+      const res = await api.post('/api/auth/login', { email, password });
+      const { token, ...user } = res.data;
 
-    const mockToken = 'mock-jwt-token-phase1';
-    const mockUser = {
-      id: '1',
-      email,
-      name: 'Demo User',
-      role: 'ADMIN',
-      tenantId: 'org_demo',
-    };
-
-    // Store in Zustand — Axios interceptor will now attach this to every request
-    setAuth(mockToken, mockUser);
+      // Store in Zustand — Axios interceptor will now attach this to every request
+      setAuth(token, user);
+    } catch (err) {
+      console.error('Login failed:', err);
+      throw err;
+    }
   }, [setAuth]);
 
-  // logout() — called by sidebar logout button (Phase 2)
+  // register() — added for Phase 2
+  const register = useCallback(async (data) => {
+    try {
+      const res = await api.post('/api/auth/register', data);
+      const { token, ...user } = res.data;
+      setAuth(token, user);
+    } catch (err) {
+      console.error('Registration failed:', err);
+      throw err;
+    }
+  }, [setAuth]);
+
+  // logout() — called by sidebar logout button
   const logout = useCallback(() => {
     clearAuth();
-    // Phase 2: also call api.post('/api/auth/logout') to blacklist token server-side
+    // In Phase 2, we could also call api.post('/api/auth/logout') if tracking tokens
   }, [clearAuth]);
 
   const value = {
@@ -54,6 +109,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!token,  // true if token exists, false if null
     isLoading,
     login,
+    register,
     logout,
   };
 

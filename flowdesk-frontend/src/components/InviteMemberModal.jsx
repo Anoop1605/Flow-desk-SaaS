@@ -6,10 +6,11 @@ import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { modalVariants } from '../lib/animations';
 
-export default function InviteMemberModal({ open, onOpenChange }) {
+export default function InviteMemberModal({ open, onOpenChange, onSubmit }) {
     const [email, setEmail] = useState('');
-    const [role, setRole] = useState('MEMBER');
+    const [role, setRole] = useState('ORGANIZATION_MEMBER');
     const [errors, setErrors] = useState({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const validate = () => {
         const newErrors = {};
@@ -22,20 +23,31 @@ export default function InviteMemberModal({ open, onOpenChange }) {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validate()) return;
 
-        // Phase 1: just show a success toast (no real API call)
-        toast.success('Invitation sent!', {
-            description: `An invite has been sent to ${email} as ${role.toLowerCase()}.`,
-        });
+        setIsSubmitting(true);
+        try {
+            await onSubmit({ email, role });
 
-        // Reset form
-        setEmail('');
-        setRole('MEMBER');
-        setErrors({});
-        onOpenChange(false);
+            toast.success('Member added to workspace', {
+                description: `${email} can now be managed from the Team page.`,
+            });
+
+            setEmail('');
+            setRole('ORGANIZATION_MEMBER');
+            setErrors({});
+            onOpenChange(false);
+        } catch (error) {
+            const errorMessage = error?.response?.data?.message || error?.response?.data || error?.message || 'Failed to invite member';
+            toast.error('Failed to invite member', {
+                description: typeof errorMessage === 'string' ? errorMessage : 'An error occurred while inviting the member.',
+            });
+            console.error('Invite error:', error);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleOpenChange = (isOpen) => {
@@ -58,13 +70,14 @@ export default function InviteMemberModal({ open, onOpenChange }) {
                                 className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
                             />
                         </Dialog.Overlay>
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                         <Dialog.Content asChild>
                             <motion.div
                                 variants={modalVariants}
                                 initial="hidden"
                                 animate="visible"
                                 exit="exit"
-                                className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-2xl bg-surface-primary border border-white/[0.1] shadow-2xl"
+                                className="w-full max-w-md rounded-2xl bg-surface-primary border border-white/[0.1] shadow-2xl"
                             >
                                 {/* Header */}
                                 <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.08]">
@@ -73,7 +86,7 @@ export default function InviteMemberModal({ open, onOpenChange }) {
                                             Invite Member
                                         </Dialog.Title>
                                         <Dialog.Description className="text-xs text-slate-400 mt-0.5">
-                                            Send an invitation to join the organization
+                                            Add or update a workspace member by email
                                         </Dialog.Description>
                                     </div>
                                     <Dialog.Close className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
@@ -115,16 +128,16 @@ export default function InviteMemberModal({ open, onOpenChange }) {
                                             onChange={(e) => setRole(e.target.value)}
                                             className="appearance-none w-full px-4 py-2.5 rounded-xl bg-surface-secondary border border-white/[0.08] text-sm text-slate-300 cursor-pointer hover:bg-surface-tertiary transition-colors"
                                         >
-                                            <option value="MEMBER">Member — Can view & update assigned tasks</option>
-                                            <option value="MANAGER">Manager — Can manage projects & assign tasks</option>
+                                            <option value="ORGANIZATION_MEMBER">Member — Can collaborate on workspace tasks</option>
+                                            <option value="ORGANIZATION_OWNER">Owner — Can manage workspace configuration</option>
                                         </select>
                                     </div>
 
                                     {/* Info box */}
                                     <div className="rounded-xl bg-indigo-500/5 border border-indigo-500/15 p-3.5">
                                         <p className="text-xs text-indigo-300/80 leading-relaxed">
-                                            If the email is not yet registered, they'll receive an invite link.
-                                            Their account will be created with <span className="font-medium text-indigo-300">PENDING</span> status until first login.
+                                            This demo flow creates or updates the member record inside FlowDesk.
+                                            Email delivery is not configured yet, so no real invitation email is sent.
                                         </p>
                                     </div>
 
@@ -135,15 +148,17 @@ export default function InviteMemberModal({ open, onOpenChange }) {
                                         </Dialog.Close>
                                         <button
                                             type="submit"
+                                            disabled={isSubmitting}
                                             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors shadow-glow-sm"
                                         >
                                             <Send size={14} />
-                                            Send Invite
+                                            {isSubmitting ? 'Saving...' : 'Add Member'}
                                         </button>
                                     </div>
                                 </form>
                             </motion.div>
                         </Dialog.Content>
+                        </div>
                     </Dialog.Portal>
                 )}
             </AnimatePresence>

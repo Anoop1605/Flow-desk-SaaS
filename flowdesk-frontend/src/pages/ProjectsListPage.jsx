@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -6,10 +6,9 @@ import {
     Plus, Search, Users, CheckSquare, FolderKanban,
     MoreHorizontal, ArrowUpRight, Filter
 } from 'lucide-react';
-import { queryKeys } from '../lib/api';
+import { queryKeys, projectApi } from '../lib/api';
 import { fadeUp, staggerContainer, cardVariant } from '../lib/animations';
 import { cn } from '../lib/utils';
-import { MOCK_PROJECTS } from '../data/mockData';
 import CreateProjectModal from '../components/CreateProjectModal';
 import RoleGuard from '../components/RoleGuard';
 
@@ -21,11 +20,7 @@ const statusConfig = {
     ARCHIVED: { label: 'Archived', className: 'bg-slate-500/15 text-slate-400 border-slate-500/30' },
 };
 
-// Phase 1: mock fetch
-const fetchProjects = async () => {
-    await new Promise((r) => setTimeout(r, 600));
-    return MOCK_PROJECTS;
-};
+import { toast } from 'sonner';
 
 function ProjectCard({ project }) {
     const status = statusConfig[project.status] || statusConfig.ACTIVE;
@@ -72,20 +67,20 @@ function ProjectCard({ project }) {
                 <div className="flex items-center gap-5 text-xs text-slate-500">
                     <div className="flex items-center gap-1.5">
                         <Users size={13} className="text-slate-500" />
-                        <span>{project.memberCount} members</span>
+                        <span>{project.memberCount || 0} members</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <CheckSquare size={13} className="text-slate-500" />
-                        <span>{project.taskCount} tasks</span>
+                        <span>{project.taskCount || 0} tasks</span>
                     </div>
                 </div>
 
                 {/* Owner */}
                 <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center gap-2">
                     <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-[9px] font-medium text-white">
-                        {project.ownerName.split(' ').map(n => n[0]).join('')}
+                        {project.ownerName ? project.ownerName.split(' ').map(n => n[0]).join('') : 'U'}
                     </div>
-                    <span className="text-xs text-slate-500">{project.ownerName}</span>
+                    <span className="text-xs text-slate-500">{project.ownerName || 'Unknown Owner'}</span>
                 </div>
             </Link>
         </motion.div>
@@ -97,17 +92,35 @@ export default function ProjectsListPage() {
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
+    const queryClient = useQueryClient();
+
     const { data: projects, isLoading } = useQuery({
-        queryKey: queryKeys.projects,
-        queryFn: fetchProjects,
+        queryKey: [...queryKeys.projects, statusFilter],
+        queryFn: async () => {
+            const params = statusFilter !== 'ALL' ? { status: statusFilter } : {};
+            const res = await projectApi.getAll(params);
+            return res.data;
+        },
+        staleTime: 1000 * 60 * 5, // 5 minutes
+    });
+
+    const createProjectMutation = useMutation({
+        mutationFn: (data) => projectApi.create(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+            toast.success('Project created successfully!');
+        },
+        onError: (err) => {
+            toast.error('Failed to create project');
+            console.error(err);
+        }
     });
 
     // Filter projects
     const filtered = (projects || []).filter((p) => {
         const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             p.description.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = statusFilter === 'ALL' || p.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        return matchesSearch;
     });
 
     if (isLoading) {
@@ -134,7 +147,7 @@ export default function ProjectsListPage() {
                     <h1 className="text-3xl font-display font-bold text-white tracking-tight">Projects</h1>
                     <p className="text-slate-400 mt-1">Manage your organization's projects</p>
                 </div>
-                <RoleGuard allowedRoles={['ADMIN', 'MANAGER']}>
+                <RoleGuard allowedRoles={['ORGANIZATION_OWNER', 'ORGANIZATION_MEMBER']}>
                     <button
                         onClick={() => setIsCreateOpen(true)}
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors shadow-glow-sm hover:shadow-glow-md"
@@ -185,6 +198,17 @@ export default function ProjectsListPage() {
                             ? 'Try adjusting your search or filter to find what you\'re looking for.'
                             : 'Create your first project to get started.'}
                     </p>
+                    {(!searchQuery && statusFilter === 'ALL') && (
+                        <RoleGuard allowedRoles={['ORGANIZATION_OWNER', 'ORGANIZATION_MEMBER']}>
+                            <button
+                                onClick={() => setIsCreateOpen(true)}
+                                className="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-all shadow-glow-sm hover:shadow-glow-md"
+                            >
+                                <Plus size={16} />
+                                Create First Project
+                            </button>
+                        </RoleGuard>
+                    )}
                 </motion.div>
             ) : (
                 <motion.div variants={staggerContainer} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -195,7 +219,11 @@ export default function ProjectsListPage() {
             )}
 
             {/* Create Project Modal */}
-            <CreateProjectModal open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+            <CreateProjectModal 
+                open={isCreateOpen} 
+                onOpenChange={setIsCreateOpen} 
+                onSubmit={(data) => createProjectMutation.mutateAsync(data)}
+            />
         </motion.div>
     );
 }

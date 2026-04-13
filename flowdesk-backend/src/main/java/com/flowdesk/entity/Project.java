@@ -33,8 +33,9 @@ public class Project {
     @Column(name = "owner_id")
     private Long ownerId;
 
-    @Column(name = "tenant_id", nullable = false)
-    private Long tenantId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false)
+    private Organization organization;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -59,13 +60,13 @@ public class Project {
     }
 
     public Project(String name, String description, ProjectStatus status,
-                   String colorTag, Long ownerId, Long tenantId) {
+                   String colorTag, Long ownerId, Organization organization) {
         this.name = name;
         this.description = description;
         this.status = status;
         this.colorTag = colorTag;
         this.ownerId = ownerId;
-        this.tenantId = tenantId;
+        this.organization = organization;
     }
 
     // ── Getters & Setters ──
@@ -117,12 +118,12 @@ public class Project {
         this.ownerId = ownerId;
     }
 
-    public Long getTenantId() {
-        return tenantId;
+    public Organization getOrganization() {
+        return organization;
     }
 
-    public void setTenantId(Long tenantId) {
-        this.tenantId = tenantId;
+    public void setOrganization(Organization organization) {
+        this.organization = organization;
     }
 
     public LocalDateTime getCreatedAt() {

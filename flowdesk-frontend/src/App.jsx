@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink, useLocation, Outlet, Link } from 'react-router-dom';
 import { LayoutDashboard, KanbanSquare, CheckSquare, Search, Menu, X, Bell, UserCircle, Activity, FolderKanban, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Toaster } from 'sonner';
 import { cn } from './lib/utils';
@@ -10,7 +10,7 @@ import KanbanBoard from './pages/KanbanBoard';
 import ProtectedRoute from './components/ProtectedRoute';
 import CommandPalette from './components/CommandPalette';
 import TaskDetailDrawer from './components/TaskDetailDrawer';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
@@ -18,17 +18,23 @@ import ActivityLogPage from './pages/ActivityLogPage';
 import ProjectsListPage from './pages/ProjectsListPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import TeamPage from './pages/TeamPage';
+import MyTasksPage from './pages/MyTasksPage';
+import CreateTaskModal from './components/CreateTaskModal';
+import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
+import { activityApi, taskApi, queryKeys } from './lib/api';
+import { toast } from 'sonner';
 
 function Sidebar({ isOpen, setIsOpen }) {
   // ... rest remains same until DashboardLayout
 
   const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
 
+  const lastProjectId = useUIStore((s) => s.lastProjectId);
   const navLinks = [
     { name: 'Dashboard', to: '/', icon: LayoutDashboard },
     { name: 'Projects', to: '/projects', icon: FolderKanban },
     { name: 'Team', to: '/team', icon: Users },
-    { name: 'Kanban Board', to: '/projects/1/board', icon: KanbanSquare },
+    { name: 'Kanban Board', to: lastProjectId ? `/projects/${lastProjectId}/board` : '/projects', icon: KanbanSquare },
     { name: 'My Tasks', to: '/my-tasks', icon: CheckSquare },
     { name: 'Profile', to: '/profile', icon: UserCircle },
     { name: 'Activity', to: '/activity', icon: Activity },
@@ -121,6 +127,20 @@ function Sidebar({ isOpen, setIsOpen }) {
 }
 
 function Topbar({ setSidebarOpen }) {
+  const { user } = useAuth();
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const initials = user?.name 
+    ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '??';
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: ['topbar-notifications'],
+    queryFn: async () => {
+      const res = await activityApi.getActivityFeed();
+      return (res.data || []).slice(0, 5);
+    },
+  });
+
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 border-b border-white/[0.08] bg-surface-primary/80 backdrop-blur-xl">
       <div className="flex items-center gap-4">
@@ -129,12 +149,48 @@ function Topbar({ setSidebarOpen }) {
         </button>
       </div>
       <div className="flex items-center gap-4">
-        <button className="relative w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
-          <Bell size={18} />
-          <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 border border-surface-primary"></span>
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setIsNotificationsOpen((prev) => !prev)}
+            className="relative w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/5 hover:text-white transition-colors"
+            aria-label="Open notifications"
+          >
+            <Bell size={18} />
+            {notifications.length > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 border border-surface-primary"></span>
+            )}
+          </button>
+
+          {isNotificationsOpen && (
+            <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-white/[0.08] bg-surface-primary/95 shadow-2xl backdrop-blur-xl p-3 z-50">
+              <div className="flex items-center justify-between px-2 py-1 mb-1">
+                <p className="text-sm font-semibold text-white">Notifications</p>
+                <Link
+                  to="/activity"
+                  onClick={() => setIsNotificationsOpen(false)}
+                  className="text-xs text-indigo-300 hover:text-indigo-200"
+                >
+                  View all
+                </Link>
+              </div>
+
+              {notifications.length === 0 ? (
+                <p className="px-2 py-3 text-sm text-slate-400">No recent activity</p>
+              ) : (
+                <div className="max-h-80 overflow-auto space-y-1">
+                  {notifications.map((item) => (
+                    <div key={item.id} className="px-2 py-2 rounded-xl hover:bg-white/5 transition-colors">
+                      <p className="text-sm text-slate-200 line-clamp-2">{item.description}</p>
+                      <p className="text-xs text-slate-500 mt-1">{item.action}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <Link to="/profile" className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-sm font-medium text-white shadow-glow-sm cursor-pointer border border-white/[0.08] hover:shadow-glow-md transition-shadow">
-          MP
+          {initials}
         </Link>
       </div>
     </header>
@@ -143,11 +199,50 @@ function Topbar({ setSidebarOpen }) {
 
 function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { isCreateTaskModalOpen, closeCreateTaskModal, modalDefaultStatus } = useUIStore();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  // Extract projectId from URL if present (e.g. /projects/1/board)
+  const pathMatch = location.pathname.match(/\/projects\/(\d+)/);
+  const projectId = pathMatch ? pathMatch[1] : null;
+  const setLastProjectId = useUIStore((s) => s.setLastProjectId);
+
+  // Persist last visited project
+  useEffect(() => {
+    if (projectId) setLastProjectId(projectId);
+  }, [projectId, setLastProjectId]);
+
+  const createTaskMutation = useMutation({
+    mutationFn: (taskData) => {
+      if (!projectId) {
+        throw new Error("Please select a project first.");
+      }
+      return taskApi.create({ ...taskData, projectId: parseInt(projectId, 10) });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.myTasks });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
+      queryClient.invalidateQueries({ queryKey: ['activity'] });
+      queryClient.invalidateQueries({ queryKey: ['topbar-notifications'] });
+      closeCreateTaskModal();
+      toast.success("Task created!");
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to create task");
+    }
+  });
 
   return (
     <div className="flex min-h-[100dvh] bg-surface-canvas selection:bg-indigo-500/30">
       <CommandPalette />
       <TaskDetailDrawer />
+      <CreateTaskModal
+        isOpen={isCreateTaskModalOpen}
+        onClose={closeCreateTaskModal}
+        onSubmit={(data) => createTaskMutation.mutateAsync(data)}
+        defaultStatus={modalDefaultStatus}
+      />
       <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -196,7 +291,7 @@ export default function App() {
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
             <Route path="/projects/:id/board" element={<KanbanBoard />} />
             <Route path="/team" element={<TeamPage />} />
-            <Route path="/my-tasks" element={<div className="text-white">My Tasks Coming Soon</div>} />
+            <Route path="/my-tasks" element={<MyTasksPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/activity" element={<ActivityLogPage />} />
           </Route>

@@ -7,27 +7,33 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { persist } from 'zustand/middleware';
 
 export const useAuthStore = create()(
-  immer((set) => ({
-    // The JWT token string — null means "not logged in"
-    token: null,
+  persist(
+    immer((set) => ({
+      // The JWT token string — null means "not logged in"
+      token: null,
 
-    // The logged-in user's profile (id, name, email, role, tenantId)
-    user: null,
+      // The logged-in user's profile (id, name, email, role, tenantId)
+      user: null,
 
-    // Called after successful login — stores both token and user together
-    setAuth: (token, user) =>
-      set((state) => {
-        state.token = token;
-        state.user = user;
-      }),
+      // Called after successful login — stores both token and user together
+      setAuth: (token, user) =>
+        set((state) => {
+          state.token = token;
+          state.user = user;
+        }),
 
-    // Called on logout — wipes everything
-    clearAuth: () =>
-      set((state) => {
-        state.token = null;
-        state.user = null;
-      }),
-  }))
+      // Called on logout — wipes everything
+      clearAuth: () =>
+        set((state) => {
+          state.token = null;
+          state.user = null;
+        }),
+    })),
+    {
+      name: 'flowdesk-auth-storage', // name of item in localStorage
+    }
+  )
 );

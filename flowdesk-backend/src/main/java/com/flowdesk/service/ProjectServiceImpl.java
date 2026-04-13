@@ -2,53 +2,130 @@ package com.flowdesk.service;
 
 import com.flowdesk.dto.ProjectCreateRequest;
 import com.flowdesk.dto.ProjectResponse;
+import com.flowdesk.entity.Project;
 import com.flowdesk.repository.ProjectRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 /**
- * ProjectServiceImpl — Member 2
- * Stub implementation for Phase 1. Methods throw UnsupportedOperationException
- * since the ProjectController returns mock data directly in Phase 1.
- * Phase 2: will implement full CRUD with tenant scoping.
+ * ProjectServiceImpl
+ * Implements ProjectService with JPA persistence and organization-scoping.
  */
 @Service
 public class ProjectServiceImpl implements ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final ActivityLogService activityLogService;
 
-    public ProjectServiceImpl(ProjectRepository projectRepository) {
+    public ProjectServiceImpl(ProjectRepository projectRepository, ActivityLogService activityLogService) {
         this.projectRepository = projectRepository;
+        this.activityLogService = activityLogService;
     }
 
     @Override
-    public List<ProjectResponse> getAllProjects(Long tenantId) {
-        // Phase 2: return projectRepository.findByTenantId(tenantId) mapped to DTOs
-        throw new UnsupportedOperationException("Phase 2: implement with tenant scoping");
+    public List<ProjectResponse> getAllProjects(Long organizationId) {
+        return getAllProjects(organizationId, null);
     }
 
     @Override
-    public ProjectResponse getProjectById(Long id) {
-        // Phase 2: fetch from repo, map to DTO
-        throw new UnsupportedOperationException("Phase 2: implement with tenant scoping");
+    public List<ProjectResponse> getAllProjects(Long organizationId, String status) {
+        if (status == null || status.isBlank() || "ALL".equalsIgnoreCase(status)) {
+            return projectRepository.findByOrganizationId(organizationId).stream()
+                    .map(this::mapToResponse)
+                    .toList();
+        }
+
+        com.flowdesk.enums.ProjectStatus parsedStatus = com.flowdesk.enums.ProjectStatus.valueOf(status.toUpperCase());
+
+        return projectRepository.findByOrganizationIdAndStatus(organizationId, parsedStatus).stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
     @Override
-    public ProjectResponse createProject(ProjectCreateRequest request, Long tenantId, Long ownerId) {
-        // Phase 2: map DTO → entity, save, return response
-        throw new UnsupportedOperationException("Phase 2: implement with tenant scoping");
+    public ProjectResponse getProjectById(Long id, Long organizationId) {
+        return projectRepository.findById(id)
+                .filter(p -> p.getOrganization().getId().equals(organizationId))
+                .map(this::mapToResponse)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
     }
 
     @Override
-    public ProjectResponse updateProject(Long id, ProjectCreateRequest request) {
-        // Phase 2: find by id, apply updates, save, return
-        throw new UnsupportedOperationException("Phase 2: implement");
+    public ProjectResponse createProject(ProjectCreateRequest request, Long organizationId, Long userId,
+            String userName) {
+        Project project = new Project();
+        project.setName(request.getName());
+        project.setDescription(request.getDescription());
+        project.setColorTag(request.getColorTag());
+        project.setOwnerId(userId);
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            project.setStatus(com.flowdesk.enums.ProjectStatus.valueOf(request.getStatus().toUpperCase()));
+        }
+
+        com.flowdesk.entity.Organization org = new com.flowdesk.entity.Organization();
+        org.setId(organizationId);
+        project.setOrganization(org);
+
+        Project saved = projectRepository.save(project);
+
+        // Log Activity
+        activityLogService.log("PROJECT_CREATED",
+                userName + " created project: " + project.getName(),
+                userId, userName, organizationId, saved.getId(), "PROJECT");
+
+        return mapToResponse(saved);
     }
 
     @Override
-    public void deleteProject(Long id) {
-        // Phase 2: soft delete or archive
-        throw new UnsupportedOperationException("Phase 2: implement");
+    public ProjectResponse updateProject(Long id, ProjectCreateRequest request, Long organizationId, Long userId,
+            String userName) {
+        Project project = projectRepository.findById(id)
+                .filter(p -> p.getOrganization().getId().equals(organizationId))
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+
+        project.setName(request.getName());
+        project.setDescription(request.getDescription());
+        project.setColorTag(request.getColorTag());
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            project.setStatus(com.flowdesk.enums.ProjectStatus.valueOf(request.getStatus().toUpperCase()));
+        }
+
+        Project saved = projectRepository.save(project);
+
+        // Log Activity
+        activityLogService.log("PROJECT_UPDATED",
+                userName + " updated project: " + project.getName(),
+                userId, userName, organizationId, saved.getId(), "PROJECT");
+
+        return mapToResponse(saved);
+    }
+
+    @Override
+    public void deleteProject(Long id, Long organizationId, Long userId, String userName) {
+        Project project = projectRepository.findById(id)
+                .filter(p -> p.getOrganization().getId().equals(organizationId))
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+
+        String projectName = project.getName();
+        projectRepository.delete(project);
+
+        // Log Activity
+        activityLogService.log("PROJECT_DELETED",
+                userName + " deleted project: " + projectName,
+                userId, userName, organizationId, id, "PROJECT");
+    }
+
+    private ProjectResponse mapToResponse(Project project) {
+        ProjectResponse response = new ProjectResponse();
+        response.setId(project.getId());
+        response.setName(project.getName());
+        response.setDescription(project.getDescription());
+        response.setStatus(project.getStatus().name());
+        response.setColorTag(project.getColorTag());
+        response.setOwnerId(project.getOwnerId());
+        response.setCreatedAt(project.getCreatedAt());
+        response.setUpdatedAt(project.getUpdatedAt());
+        return response;
     }
 }

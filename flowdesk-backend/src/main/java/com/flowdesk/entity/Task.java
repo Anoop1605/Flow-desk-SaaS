@@ -43,6 +43,10 @@ public class Task {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false)
+    private Organization organization;
+
     // ── Lifecycle Callbacks ──
     @PrePersist
     protected void onCreate() {
@@ -60,7 +64,7 @@ public class Task {
     }
 
     public Task(String title, String description, TaskStatus status, Priority priority,
-            Long projectId, Long assigneeId, LocalDate dueDate) {
+            Long projectId, Long assigneeId, LocalDate dueDate, Organization organization) {
         this.title = title;
         this.description = description;
         this.status = status;
@@ -68,6 +72,7 @@ public class Task {
         this.projectId = projectId;
         this.assigneeId = assigneeId;
         this.dueDate = dueDate;
+        this.organization = organization;
     }
 
     // ── Getters & Setters ──
@@ -133,6 +138,14 @@ public class Task {
 
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
+    }
+
+    public Organization getOrganization() {
+        return organization;
+    }
+
+    public void setOrganization(Organization organization) {
+        this.organization = organization;
     }
 
     public LocalDateTime getCreatedAt() {

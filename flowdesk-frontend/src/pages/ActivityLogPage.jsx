@@ -1,35 +1,13 @@
-// ActivityLogPage.jsx — FlowDesk Member 1
-// MongoDB-powered audit trail visualization (Phase 1: mock data)
-//
-// WHERE it fits:
-//   This is the "showpiece page" for Member 1.
-//   Presentation Layer → reads from GET /api/activity (mock in Phase 1)
-//   Phase 2: Real MongoDB cursor-based pagination via TanStack Query
-//
-// LAYOUT:
-//   Left  — Scrollable activity feed (flex-1)
-//   Right — Filter panel (240px sticky sidebar, desktop only)
-
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Filter,
-  Search,
-  X,
-  Calendar,
-  Loader2,
-  Inbox,
-  ChevronDown,
-} from 'lucide-react';
+import { Filter, Search, X, Loader2, Inbox, ChevronDown } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { activityApi, queryKeys } from '../lib/api';
 import * as Avatar from '@radix-ui/react-avatar';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '../lib/utils';
 import { pageVariants, fadeUp, staggerContainer } from '../lib/animations';
-
-// ─── Action Type Config ──────────────────────────────────────────────────────
-// WHY a config map? Each action type gets a unique dot color and human-readable label.
-// These map to the MongoDB document's `actionType` field.
 
 const ACTION_CONFIG = {
   TASK_CREATED: {
@@ -42,123 +20,56 @@ const ACTION_CONFIG = {
     ring: 'ring-emerald-500/20',
     label: 'Task Completed',
   },
+  TASK_UPDATED: {
+    color: 'bg-sky-500',
+    ring: 'ring-sky-500/20',
+    label: 'Task Updated',
+  },
+  TASK_DELETED: {
+    color: 'bg-rose-500',
+    ring: 'ring-rose-500/20',
+    label: 'Task Deleted',
+  },
   MEMBER_INVITED: {
     color: 'bg-violet-500',
     ring: 'ring-violet-500/20',
     label: 'Member Invited',
-  },
-  PROJECT_ARCHIVED: {
-    color: 'bg-amber-500',
-    ring: 'ring-amber-500/20',
-    label: 'Project Archived',
   },
   MEMBER_REMOVED: {
     color: 'bg-rose-500',
     ring: 'ring-rose-500/20',
     label: 'Member Removed',
   },
-  TASK_UPDATED: {
-    color: 'bg-sky-500',
-    ring: 'ring-sky-500/20',
-    label: 'Task Updated',
-  },
   PROJECT_CREATED: {
     color: 'bg-brand-500',
     ring: 'ring-brand-500/20',
     label: 'Project Created',
   },
+  PROJECT_UPDATED: {
+    color: 'bg-indigo-500',
+    ring: 'ring-indigo-500/20',
+    label: 'Project Updated',
+  },
+  PROJECT_DELETED: {
+    color: 'bg-rose-500',
+    ring: 'ring-rose-500/20',
+    label: 'Project Deleted',
+  },
+  PROJECT_ARCHIVED: {
+    color: 'bg-amber-500',
+    ring: 'ring-amber-500/20',
+    label: 'Project Archived',
+  },
 };
 
-// ─── Mock Activity Data ──────────────────────────────────────────────────────
-// WHY mock data? In Phase 1 we don't have the MongoDB backend yet.
-// Phase 2: Replace with useQuery('activity', () => activityApi.getAll())
-
-const MOCK_ACTIVITIES = [
-  {
-    id: '1',
-    actionType: 'TASK_CREATED',
-    actor: { name: 'Jane Doe', initials: 'JD' },
-    target: 'Design System Setup',
-    description: 'created task',
-    timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 min ago
-  },
-  {
-    id: '2',
-    actionType: 'MEMBER_INVITED',
-    actor: { name: 'Admin', initials: 'AD' },
-    target: 'john@flowdesk.io',
-    description: 'invited',
-    timestamp: new Date(Date.now() - 1000 * 60 * 23),
-  },
-  {
-    id: '3',
-    actionType: 'TASK_DONE',
-    actor: { name: 'John Smith', initials: 'JS' },
-    target: 'API Interceptor Config',
-    description: 'completed task',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60),
-  },
-  {
-    id: '4',
-    actionType: 'PROJECT_CREATED',
-    actor: { name: 'Jane Doe', initials: 'JD' },
-    target: 'FlowDesk v2',
-    description: 'created project',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3),
-  },
-  {
-    id: '5',
-    actionType: 'TASK_UPDATED',
-    actor: { name: 'Alice Wang', initials: 'AW' },
-    target: 'Login Page',
-    description: 'updated task',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
-  },
-  {
-    id: '6',
-    actionType: 'PROJECT_ARCHIVED',
-    actor: { name: 'Admin', initials: 'AD' },
-    target: 'Legacy Dashboard',
-    description: 'archived project',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8),
-  },
-  {
-    id: '7',
-    actionType: 'MEMBER_REMOVED',
-    actor: { name: 'Admin', initials: 'AD' },
-    target: 'bob@flowdesk.io',
-    description: 'removed',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-  },
-  {
-    id: '8',
-    actionType: 'TASK_CREATED',
-    actor: { name: 'John Smith', initials: 'JS' },
-    target: 'Kanban Board Drag & Drop',
-    description: 'created task',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 26),
-  },
-  {
-    id: '9',
-    actionType: 'TASK_DONE',
-    actor: { name: 'Alice Wang', initials: 'AW' },
-    target: 'Auth Context Setup',
-    description: 'completed task',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 30),
-  },
-  {
-    id: '10',
-    actionType: 'MEMBER_INVITED',
-    actor: { name: 'Jane Doe', initials: 'JD' },
-    target: 'charlie@flowdesk.io',
-    description: 'invited',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
-  },
-];
-
-// ─── Skeleton Loader ─────────────────────────────────────────────────────────
-// WHY skeleton? Better perceived performance than a spinner.
-// Shows the shape of the content before it loads.
+const ACTION_ALIASES = {
+  TASK_CREATED: ['TASK_CREATED', 'CREATED_TASK'],
+  TASK_UPDATED: ['TASK_UPDATED', 'UPDATED_TASK_STATUS'],
+  TASK_DELETED: ['TASK_DELETED', 'DELETED_TASK'],
+  PROJECT_CREATED: ['PROJECT_CREATED', 'CREATED_PROJECT'],
+  PROJECT_UPDATED: ['PROJECT_UPDATED', 'UPDATED_PROJECT'],
+  PROJECT_DELETED: ['PROJECT_DELETED', 'DELETED_PROJECT'],
+};
 
 function SkeletonRow() {
   return (
@@ -176,66 +87,120 @@ function SkeletonRow() {
   );
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
-
 export default function ActivityLogPage() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [activities, setActivities] = useState(MOCK_ACTIVITIES);
-  const [visibleCount, setVisibleCount] = useState(6);
+  const [visibleCount, setVisibleCount] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTypes, setSelectedTypes] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // ── Filter Logic ───────────────────────────────────────────────────────
+  const normalizeActionType = useCallback((action) => {
+    if (!action) return 'TASK_CREATED';
+
+    const upper = action.toUpperCase();
+    const mapping = {
+      CREATED_TASK: 'TASK_CREATED',
+      UPDATED_TASK_STATUS: 'TASK_UPDATED',
+      DELETED_TASK: 'TASK_DELETED',
+      CREATED_PROJECT: 'PROJECT_CREATED',
+      UPDATED_PROJECT: 'PROJECT_UPDATED',
+      DELETED_PROJECT: 'PROJECT_DELETED',
+    };
+
+    return mapping[upper] || upper;
+  }, []);
+
+  const activityParams = useMemo(() => {
+    if (selectedTypes.length === 0) {
+      return {};
+    }
+
+    const values = selectedTypes.flatMap((type) => ACTION_ALIASES[type] || [type]);
+    return {
+      actionType: [...new Set(values)].join(','),
+    };
+  }, [selectedTypes]);
+
+  const {
+    data: activities = [],
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: queryKeys.activity(activityParams),
+    queryFn: async () => {
+      const res = await activityApi.getActivityFeed(activityParams);
+      const rows = Array.isArray(res.data) ? res.data : [];
+
+      return rows.map((entry) => {
+        const rawTime = entry.createdAt || entry.timestamp;
+        const timestamp = rawTime ? new Date(rawTime) : new Date();
+
+        return {
+          id: entry.id,
+          actionType: normalizeActionType(entry.action || entry.actionType),
+          fullDescription: entry.description || '',
+          actor: {
+            name: entry.userName || 'Unknown User',
+            initials: (entry.userName
+              ? entry.userName
+                  .split(' ')
+                  .filter(Boolean)
+                  .map((chunk) => chunk[0])
+                  .join('')
+                  .toUpperCase()
+              : '??'
+            ).slice(0, 2),
+          },
+          target: entry.entityType ? `${entry.entityType} #${entry.entityId}` : '',
+          timestamp: Number.isNaN(timestamp.getTime()) ? new Date() : timestamp,
+        };
+      });
+    },
+    keepPreviousData: true,
+  });
+
   const filteredActivities = useMemo(() => {
-    let result = activities;
-
-    // Filter by action type
-    if (selectedTypes.length > 0) {
-      result = result.filter((a) => selectedTypes.includes(a.actionType));
+    if (!searchTerm.trim()) {
+      return activities;
     }
 
-    // Filter by actor name search
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(
-        (a) =>
-          a.actor.name.toLowerCase().includes(term) ||
-          a.target.toLowerCase().includes(term)
+    const term = searchTerm.toLowerCase();
+    return activities.filter((activity) => {
+      return (
+        activity.actor.name.toLowerCase().includes(term) ||
+        activity.target.toLowerCase().includes(term) ||
+        activity.fullDescription.toLowerCase().includes(term)
       );
-    }
+    });
+  }, [activities, searchTerm]);
 
-    return result;
-  }, [activities, selectedTypes, searchTerm]);
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [searchTerm, selectedTypes]);
 
   const visibleActivities = filteredActivities.slice(0, visibleCount);
   const hasMore = visibleCount < filteredActivities.length;
 
-  // ── Toggle action type filter ──────────────────────────────────────────
   const toggleType = useCallback((type) => {
     setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+      prev.includes(type) ? prev.filter((value) => value !== type) : [...prev, type]
     );
   }, []);
 
-  // ── Clear all filters ─────────────────────────────────────────────────
   const clearFilters = useCallback(() => {
     setSearchTerm('');
     setSelectedTypes([]);
   }, []);
 
-  // ── Load More (cursor-based pagination mock) ──────────────────────────
   const loadMore = useCallback(() => {
-    setIsLoading(true);
-    // Phase 1: Simulate network delay
+    setIsLoadingMore(true);
     setTimeout(() => {
-      setVisibleCount((prev) => prev + 5);
-      setIsLoading(false);
-    }, 600);
+      setVisibleCount((prev) => prev + 8);
+      setIsLoadingMore(false);
+    }, 350);
   }, []);
 
-  const activeFilterCount =
-    selectedTypes.length + (searchTerm.trim() ? 1 : 0);
+  const activeFilterCount = selectedTypes.length + (searchTerm.trim() ? 1 : 0);
 
   return (
     <motion.div
@@ -245,20 +210,14 @@ export default function ActivityLogPage() {
       exit="exit"
       className="h-full"
     >
-      {/* Page Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-display font-bold text-slate-50">
-            Activity Log
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Track everything that happens in your workspace
-          </p>
+          <h1 className="text-2xl font-display font-bold text-slate-50">Activity Log</h1>
+          <p className="text-sm text-slate-400 mt-1">Track everything that happens in your workspace</p>
         </div>
 
-        {/* Mobile filter toggle */}
         <button
-          onClick={() => setShowFilters(!showFilters)}
+          onClick={() => setShowFilters((prev) => !prev)}
           className={cn(
             'lg:hidden flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors',
             showFilters
@@ -277,14 +236,25 @@ export default function ActivityLogPage() {
       </div>
 
       <div className="flex gap-6">
-        {/* ── Left: Activity Feed ──────────────────────────────── */}
         <div className="flex-1 min-w-0">
           <div className="bg-surface rounded-2xl border border-white/5 p-6 shadow-card relative overflow-hidden">
-            {/* Top gradient accent */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-brand-500/30 to-transparent" />
 
-            {filteredActivities.length === 0 ? (
-              /* ── Empty State ──────────────────────────────── */
+            {isLoading && (
+              <div className="space-y-4">
+                {[...Array(5)].map((_, index) => (
+                  <SkeletonRow key={index} />
+                ))}
+              </div>
+            )}
+
+            {isError && !isLoading && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                <div className="text-rose-400 text-sm">Failed to load activity log. Please try again.</div>
+              </div>
+            )}
+
+            {!isLoading && !isError && filteredActivities.length === 0 && (
               <motion.div
                 variants={fadeUp}
                 initial="hidden"
@@ -294,12 +264,9 @@ export default function ActivityLogPage() {
                 <div className="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mb-4">
                   <Inbox size={32} className="text-slate-500" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-300 mb-1">
-                  No activity yet
-                </h3>
+                <h3 className="text-lg font-semibold text-slate-300 mb-1">No activity yet</h3>
                 <p className="text-sm text-slate-500 max-w-sm">
-                  Actions your team takes will appear here. Try creating a task
-                  or inviting a team member.
+                  Actions your team takes will appear here. Try creating a task or inviting a team member.
                 </p>
                 {activeFilterCount > 0 && (
                   <button
@@ -310,18 +277,13 @@ export default function ActivityLogPage() {
                   </button>
                 )}
               </motion.div>
-            ) : (
-              /* ── Timeline Feed ────────────────────────────── */
-              <motion.div
-                variants={staggerContainer}
-                initial="hidden"
-                animate="visible"
-              >
+            )}
+
+            {!isLoading && !isError && filteredActivities.length > 0 && (
+              <motion.div variants={staggerContainer} initial="hidden" animate="visible">
                 <AnimatePresence mode="popLayout">
                   {visibleActivities.map((activity, index) => {
-                    const config =
-                      ACTION_CONFIG[activity.actionType] ||
-                      ACTION_CONFIG.TASK_CREATED;
+                    const config = ACTION_CONFIG[activity.actionType] || ACTION_CONFIG.TASK_CREATED;
                     const isLast = index === visibleActivities.length - 1;
 
                     return (
@@ -334,7 +296,6 @@ export default function ActivityLogPage() {
                         layout
                         className="flex items-start gap-4 group"
                       >
-                        {/* Timeline: dot + connecting line */}
                         <div className="flex flex-col items-center pt-1">
                           <div
                             className={cn(
@@ -343,16 +304,12 @@ export default function ActivityLogPage() {
                               config.ring
                             )}
                           />
-                          {!isLast && (
-                            <div className="w-px flex-1 bg-white/5 min-h-[40px]" />
-                          )}
+                          {!isLast && <div className="w-px flex-1 bg-white/5 min-h-[40px]" />}
                         </div>
 
-                        {/* Event content */}
                         <div className="flex-1 min-w-0 pb-6">
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              {/* Actor avatar */}
                               <Avatar.Root className="shrink-0">
                                 <Avatar.Fallback
                                   delayMs={0}
@@ -362,26 +319,17 @@ export default function ActivityLogPage() {
                                 </Avatar.Fallback>
                               </Avatar.Root>
 
-                              {/* Action text */}
                               <p className="text-sm text-slate-300 truncate">
-                                <span className="font-semibold text-slate-100">
-                                  {activity.actor.name}
-                                </span>{' '}
-                                {activity.description}{' '}
-                                <span className="font-semibold text-slate-100">
-                                  {activity.target}
-                                </span>
+                                <span className="font-semibold text-slate-100">{activity.actor.name}</span>{' '}
+                                {activity.fullDescription || config.label.toLowerCase()}
                               </p>
                             </div>
 
-                            {/* Timestamp with tooltip */}
                             <Tooltip.Provider delayDuration={200}>
                               <Tooltip.Root>
                                 <Tooltip.Trigger asChild>
                                   <span className="text-xs text-slate-500 whitespace-nowrap shrink-0 cursor-default">
-                                    {formatDistanceToNow(activity.timestamp, {
-                                      addSuffix: true,
-                                    })}
+                                    {formatDistanceToNow(activity.timestamp, { addSuffix: true })}
                                   </span>
                                 </Tooltip.Trigger>
                                 <Tooltip.Portal>
@@ -390,10 +338,7 @@ export default function ActivityLogPage() {
                                     sideOffset={6}
                                     className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/10 text-xs text-slate-300 shadow-lg"
                                   >
-                                    {format(
-                                      activity.timestamp,
-                                      'MMM d, yyyy · h:mm a'
-                                    )}
+                                    {format(activity.timestamp, 'MMM d, yyyy · h:mm a')}
                                     <Tooltip.Arrow className="fill-slate-800" />
                                   </Tooltip.Content>
                                 </Tooltip.Portal>
@@ -401,7 +346,8 @@ export default function ActivityLogPage() {
                             </Tooltip.Provider>
                           </div>
 
-                          {/* Action type badge */}
+                          <p className="text-xs text-slate-500 mt-1 truncate">{activity.target}</p>
+
                           <span
                             className={cn(
                               'inline-block mt-1.5 text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full',
@@ -417,23 +363,15 @@ export default function ActivityLogPage() {
                   })}
                 </AnimatePresence>
 
-                {/* Load More Button */}
                 {hasMore && (
-                  <motion.div
-                    variants={fadeUp}
-                    className="flex justify-center pt-2"
-                  >
+                  <motion.div variants={fadeUp} className="flex justify-center pt-2">
                     <button
                       onClick={loadMore}
-                      disabled={isLoading}
+                      disabled={isLoadingMore}
                       className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-white/10 text-sm text-slate-400 hover:text-slate-200 hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                      {isLoading ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <ChevronDown size={14} />
-                      )}
-                      {isLoading ? 'Loading...' : 'Load more activity'}
+                      {isLoadingMore ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} />}
+                      {isLoadingMore ? 'Loading...' : 'Load more activity'}
                     </button>
                   </motion.div>
                 )}
@@ -442,7 +380,6 @@ export default function ActivityLogPage() {
           </div>
         </div>
 
-        {/* ── Right: Filter Panel (desktop sticky, mobile overlay) ── */}
         <div
           className={cn(
             'lg:block lg:w-60 lg:shrink-0',
@@ -450,26 +387,24 @@ export default function ActivityLogPage() {
               ? 'fixed inset-0 z-50 bg-black/60 lg:static lg:bg-transparent'
               : 'hidden'
           )}
-          onClick={(e) => {
-            // Close mobile overlay when clicking backdrop
-            if (e.target === e.currentTarget) setShowFilters(false);
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setShowFilters(false);
+            }
           }}
         >
           <div
             className={cn(
               'bg-surface rounded-2xl border border-white/5 p-5 shadow-card lg:sticky lg:top-6',
-              // Mobile: slide from right
-              showFilters && 'absolute right-0 top-0 h-full w-72 rounded-l-2xl rounded-r-none lg:static lg:w-auto lg:h-auto lg:rounded-2xl'
+              showFilters &&
+                'absolute right-0 top-0 h-full w-72 rounded-l-2xl rounded-r-none lg:static lg:w-auto lg:h-auto lg:rounded-2xl'
             )}
           >
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Filter size={16} className="text-brand-400" />
-                <h3 className="text-sm font-semibold text-slate-100">
-                  Filters
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-100">Filters</h3>
               </div>
-              {/* Mobile close */}
               <button
                 onClick={() => setShowFilters(false)}
                 className="lg:hidden text-slate-400 hover:text-slate-200"
@@ -478,7 +413,6 @@ export default function ActivityLogPage() {
               </button>
             </div>
 
-            {/* Actor Search */}
             <div className="mb-4">
               <label className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1.5 block">
                 Search
@@ -492,13 +426,12 @@ export default function ActivityLogPage() {
                   type="text"
                   placeholder="Actor or target..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(event) => setSearchTerm(event.target.value)}
                   className="w-full bg-surface-raised border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/20 transition-colors"
                 />
               </div>
             </div>
 
-            {/* Action Type Multi-Select */}
             <div className="mb-4">
               <label className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 block">
                 Action Type
@@ -515,22 +448,16 @@ export default function ActivityLogPage() {
                         : 'text-slate-400 hover:text-slate-300 hover:bg-white/[0.02]'
                     )}
                   >
-                    <div
-                      className={cn(
-                        'w-2.5 h-2.5 rounded-full shrink-0',
-                        config.color
-                      )}
-                    />
+                    <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', config.color)} />
                     <span className="truncate">{config.label}</span>
                     {selectedTypes.includes(key) && (
-                      <span className="ml-auto text-brand-400 text-xs">✓</span>
+                      <span className="ml-auto text-brand-400 text-xs">OK</span>
                     )}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Clear Filters */}
             {activeFilterCount > 0 && (
               <button
                 onClick={clearFilters}

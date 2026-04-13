@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Palette } from 'lucide-react';
+import { X, Palette, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { modalVariants } from '../lib/animations';
@@ -17,12 +17,13 @@ const COLOR_OPTIONS = [
     { value: '#84cc16', label: 'Lime' },
 ];
 
-export default function CreateProjectModal({ open, onOpenChange }) {
+export default function CreateProjectModal({ open, onOpenChange, onSubmit }) {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [status, setStatus] = useState('ACTIVE');
     const [colorTag, setColorTag] = useState('#6366f1');
     const [errors, setErrors] = useState({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const validate = () => {
         const newErrors = {};
@@ -32,22 +33,25 @@ export default function CreateProjectModal({ open, onOpenChange }) {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validate()) return;
 
-        // Phase 1: just show a success toast (no real API call)
-        toast.success('Project created successfully!', {
-            description: `"${name}" has been created.`,
-        });
-
-        // Reset form
-        setName('');
-        setDescription('');
-        setStatus('ACTIVE');
-        setColorTag('#6366f1');
-        setErrors({});
-        onOpenChange(false);
+        setIsSubmitting(true);
+        try {
+            await onSubmit({ name, description, status, colorTag });
+            // Reset form
+            setName('');
+            setDescription('');
+            setStatus('ACTIVE');
+            setColorTag('#6366f1');
+            setErrors({});
+            onOpenChange(false);
+        } catch (err) {
+            console.error('Failed to create project:', err);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleOpenChange = (isOpen) => {
@@ -177,9 +181,11 @@ export default function CreateProjectModal({ open, onOpenChange }) {
                                             </Dialog.Close>
                                             <button
                                                 type="submit"
+                                                disabled={isSubmitting}
                                                 className="px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 focus:ring-4 focus:ring-indigo-500/20 transition-all shadow-glow-sm disabled:opacity-50 flex items-center gap-2"
                                             >
-                                                Create Project
+                                                {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                                                {isSubmitting ? 'Creating...' : 'Create Project'}
                                             </button>
                                         </div>
                                     </form>

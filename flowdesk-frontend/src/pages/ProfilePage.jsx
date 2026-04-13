@@ -33,8 +33,10 @@ import * as Separator from '@radix-ui/react-separator';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
+import { authApi } from '../lib/api';
 import { cn } from '../lib/utils';
 import { pageVariants, staggerContainer, cardVariant } from '../lib/animations';
+import { useAuthStore } from '../stores/authStore';
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 // WHY separate schemas? Personal info and password change are independent forms.
@@ -128,12 +130,16 @@ export default function ProfilePage() {
   const handleProfileSave = useCallback(
     async (data) => {
       try {
-        // Phase 1: Simulate API call
-        // Phase 2: Replace with → await api.put('/api/auth/me', data);
-        await new Promise((r) => setTimeout(r, 800));
+        const res = await authApi.updateProfile(data);
+        const state = useAuthStore.getState();
+        state.setAuth(state.token, {
+          ...state.user,
+          ...res.data,
+        });
         toast.success('Profile updated');
-      } catch {
-        toast.error('Failed to update profile');
+      } catch (error) {
+        const message = error?.response?.data || 'Failed to update profile';
+        toast.error(message);
       }
     },
     []
@@ -142,13 +148,17 @@ export default function ProfilePage() {
   const handlePasswordChange = useCallback(
     async (data) => {
       try {
-        // Phase 1: Simulate API call
-        // Phase 2: Replace with → await api.put('/api/auth/me/password', data);
-        await new Promise((r) => setTimeout(r, 800));
-        toast.success('Password changed successfully');
+        await authApi.changePassword(data);
+        toast.success('Password changed successfully', {
+          description: 'Your password has been updated.',
+        });
         passwordForm.reset();
-      } catch {
-        toast.error('Failed to change password');
+      } catch (error) {
+        const message = error?.response?.data?.message || error?.response?.data || error?.message || 'Failed to change password';
+        toast.error('Password change failed', {
+          description: typeof message === 'string' ? message : 'Please try again with the correct current password.',
+        });
+        console.error('Password change error:', error);
       }
     },
     [passwordForm]
