@@ -19,4 +19,5 @@ public class AuthResponse {
     private String name;
     private GlobalRole role;
     private Long organizationId;
+    private String avatar;
 }

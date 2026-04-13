@@ -85,12 +85,21 @@ function TaskCardComponent({ task, overlay = false }) {
                 </div>
 
                 {task.assignee && (
-                    <div
-                        className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-2 ring-surface-primary"
-                        title={task.assignee.name}
-                    >
-                        {task.assignee.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                    </div>
+                    task.assignee.avatar ? (
+                        <img
+                            src={task.assignee.avatar}
+                            alt={task.assignee.name}
+                            title={task.assignee.name}
+                            className="w-6 h-6 rounded-full object-cover shadow-sm ring-2 ring-surface-primary"
+                        />
+                    ) : (
+                        <div
+                            className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-2 ring-surface-primary"
+                            title={task.assignee.name}
+                        >
+                            {task.assignee.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                        </div>
+                    )
                 )}
             </div>
         </div>

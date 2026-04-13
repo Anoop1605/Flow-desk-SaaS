@@ -10,7 +10,7 @@
 //   Phase 1: Mock data, forms work locally but don't hit backend
 //   Phase 2: Save fires PUT /api/auth/me and PUT /api/auth/me/password
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -97,9 +97,44 @@ const ROLE_STYLES = {
 
 export default function ProfilePage() {
   const { user } = useAuth();
+  const fileInputRef = useRef(null);
+  const [avatar, setAvatar] = useState(user?.avatar || null);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('Image size should be less than 2MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Avatar = reader.result;
+        setAvatar(base64Avatar);
+        
+        // Auto-save the new avatar immediately
+        try {
+          const res = await authApi.updateProfile({
+            firstName: profileForm.getValues('firstName'),
+            lastName: profileForm.getValues('lastName'),
+            avatar: base64Avatar
+          });
+          const state = useAuthStore.getState();
+          state.setAuth(state.token, {
+            ...state.user,
+            ...res.data,
+          });
+          toast.success('Profile photo updated successfully');
+        } catch (error) {
+          toast.error('Failed to save profile photo');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Split user name into first/last for the form defaults
   const nameParts = (user?.name || 'Demo User').split(' ');
@@ -128,7 +163,8 @@ export default function ProfilePage() {
   // ── Submit Handlers ─────────────────────────────────────────────────────
 
   const handleProfileSave = useCallback(
-    async (data) => {
+    async (formData) => {
+        const data = { ...formData, avatar };
       try {
         const res = await authApi.updateProfile(data);
         const state = useAuthStore.getState();
@@ -142,11 +178,12 @@ export default function ProfilePage() {
         toast.error(message);
       }
     },
-    []
+    [avatar]
   );
 
   const handlePasswordChange = useCallback(
-    async (data) => {
+    async (formData) => {
+        const data = { ...formData, avatar };
       try {
         await authApi.changePassword(data);
         toast.success('Password changed successfully', {
@@ -206,7 +243,7 @@ export default function ProfilePage() {
             <Avatar.Root className="relative shrink-0">
               <Avatar.Image
                 className="w-16 h-16 rounded-full object-cover"
-                src={undefined} // No avatar URL in Phase 1
+                src={avatar || user?.avatar || undefined}
                 alt={user?.name || 'User'}
               />
               <Avatar.Fallback
@@ -226,30 +263,20 @@ export default function ProfilePage() {
               </p>
             </div>
 
-            {/* Change Photo — disabled in Phase 1 */}
-            <Tooltip.Provider delayDuration={300}>
-              <Tooltip.Root>
-                <Tooltip.Trigger asChild>
-                  <button
-                    disabled
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-white/10 text-sm text-slate-400 opacity-50 cursor-not-allowed"
-                  >
-                    <Camera size={16} />
-                    Change Photo
-                  </button>
-                </Tooltip.Trigger>
-                <Tooltip.Portal>
-                  <Tooltip.Content
-                    side="top"
-                    sideOffset={6}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/10 text-xs text-slate-300 shadow-lg"
-                  >
-                    Available in Phase 3
-                    <Tooltip.Arrow className="fill-slate-800" />
-                  </Tooltip.Content>
-                </Tooltip.Portal>
-              </Tooltip.Root>
-            </Tooltip.Provider>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handlePhotoUpload}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-brand-500/30 bg-brand-500/10 text-sm text-brand-400 hover:bg-brand-500/20 hover:border-brand-500/50 transition-colors shadow-sm"
+            >
+              <Camera size={16} />
+              Change Photo
+            </button>
           </div>
         </motion.div>
 

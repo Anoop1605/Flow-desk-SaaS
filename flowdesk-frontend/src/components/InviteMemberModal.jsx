@@ -30,9 +30,8 @@ export default function InviteMemberModal({ open, onOpenChange, onSubmit }) {
         setIsSubmitting(true);
         try {
             await onSubmit({ email, role });
-
-            toast.success('Member added to workspace', {
-                description: `${email} can now be managed from the Team page.`,
+            toast.success('Invitation sent successfully!', {
+                description: `An email has been sent to ${email} with instructions to join the workspace.`,
             });
 
             setEmail('');
@@ -134,10 +133,9 @@ export default function InviteMemberModal({ open, onOpenChange, onSubmit }) {
                                     </div>
 
                                     {/* Info box */}
-                                    <div className="rounded-xl bg-indigo-500/5 border border-indigo-500/15 p-3.5">
-                                        <p className="text-xs text-indigo-300/80 leading-relaxed">
-                                            This demo flow creates or updates the member record inside FlowDesk.
-                                            Email delivery is not configured yet, so no real invitation email is sent.
+                                    <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/15 p-3.5">
+                                        <p className="text-xs text-emerald-300/80 leading-relaxed">
+                                            An invitation email will be sent containing a secure link to join the workspace and create their password.
                                         </p>
                                     </div>
 

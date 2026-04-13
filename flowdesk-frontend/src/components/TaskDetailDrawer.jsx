@@ -32,6 +32,8 @@ export default function TaskDetailDrawer() {
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
                 <Drawer.Content className="fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[480px] bg-surface-secondary shadow-glow-xl border-l border-white/[0.08] flex flex-col focus:outline-none">
+                    <Drawer.Title className="sr-only">Task Details</Drawer.Title>
+                    <Drawer.Description className="sr-only">Details, status, and comments for the selected task</Drawer.Description>
                     <div className="flex-1 overflow-y-auto w-full">
                         {/* Header */}
                         <div className="sticky top-0 z-10 flex items-center justify-between px-6 h-20 border-b border-white/[0.08] bg-surface-secondary/80 backdrop-blur-xl">

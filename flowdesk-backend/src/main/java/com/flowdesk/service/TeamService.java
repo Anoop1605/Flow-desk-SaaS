@@ -16,6 +16,10 @@ public interface TeamService {
     TeamMemberResponse inviteMemberByEmail(String email, String role, Long organizationId, Long actorUserId,
             String actorUserName);
 
+    TeamMemberResponse updateOrganizationRole(Long organizationId, Long userId, String newRole);
+
+    void removeOrganizationMember(Long organizationId, Long userId);
+
     List<TeamMemberResponse> getProjectMembers(Long projectId);
 
     TeamMemberResponse addMemberToProject(Long projectId, Long userId, String role);

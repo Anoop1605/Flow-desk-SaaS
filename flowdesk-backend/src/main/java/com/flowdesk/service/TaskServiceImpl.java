@@ -52,6 +52,7 @@ public class TaskServiceImpl implements TaskService {
         task.setProjectId(request.getProjectId());
         task.setAssigneeId(request.getAssigneeId() != null ? request.getAssigneeId() : userId);
         task.setDueDate(request.getDueDate());
+        task.setTenantId(organizationId);
 
         com.flowdesk.entity.Organization org = new com.flowdesk.entity.Organization();
         org.setId(organizationId);
@@ -156,7 +157,7 @@ public class TaskServiceImpl implements TaskService {
 
         if (task.getAssigneeId() != null) {
             userRepository.findById(task.getAssigneeId()).ifPresent(user -> {
-                response.setAssignee(new AssigneeDTO(user.getId(), user.getName()));
+                response.setAssignee(new AssigneeDTO(user.getId(), user.getName(), user.getAvatar()));
             });
         }
 

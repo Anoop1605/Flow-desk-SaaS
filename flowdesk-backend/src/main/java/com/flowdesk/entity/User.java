@@ -33,12 +33,18 @@ public class User {
     @Column(nullable = false)
     private GlobalRole role;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "organization_id")
     private Organization organization; // Phase 2: Multi-tenancy
 
+    @Column(name = "invitation_token", unique = true)
+    private String invitationToken;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(columnDefinition = "TEXT")
+    private String avatar;
 
     @PrePersist
     protected void onCreate() {

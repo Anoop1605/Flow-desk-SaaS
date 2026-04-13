@@ -5,12 +5,11 @@ import { useParams, Link } from 'react-router-dom';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
     ArrowLeft, Users, CheckSquare, Settings, LayoutDashboard,
-    KanbanSquare, Calendar, MoreHorizontal, Mail, Shield
+    KanbanSquare, Calendar, Mail, Shield
 } from 'lucide-react';
-import { queryKeys } from '../lib/api';
+import { queryKeys, projectApi } from '../lib/api';
 import { fadeUp, staggerContainer } from '../lib/animations';
 import { cn } from '../lib/utils';
-import { MOCK_PROJECTS, MOCK_PROJECT_MEMBERS } from '../data/mockData';
 import { formatDistanceToNow } from 'date-fns';
 
 const statusConfig = {
@@ -25,15 +24,16 @@ const roleConfig = {
     MEMBER: { label: 'Member', className: 'bg-slate-500/15 text-slate-300 border-slate-500/30' },
 };
 
-// Phase 1: mock fetchers
+// Fetch project details from API
 const fetchProject = async (id) => {
-    await new Promise((r) => setTimeout(r, 500));
-    return MOCK_PROJECTS.find(p => p.id === Number(id)) || MOCK_PROJECTS[0];
+    const { data } = await projectApi.getById(id);
+    return data;
 };
 
-const fetchProjectMembers = async () => {
-    await new Promise((r) => setTimeout(r, 400));
-    return MOCK_PROJECT_MEMBERS;
+// Fetch project members from API
+const fetchProjectMembers = async (id) => {
+    const { data } = await projectApi.getMembers(id);
+    return data;
 };
 
 function StatMini({ icon: Icon, label, value, colorClass }) {
@@ -200,9 +200,17 @@ export default function ProjectDetailPage() {
                                         return (
                                             <div key={member.id} className="flex items-center justify-between px-6 py-4 hover:bg-white/[0.02] transition-colors">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-xs font-medium text-white">
-                                                        {member.userName.split(' ').map(n => n[0]).join('')}
-                                                    </div>
+                                                        {member.userAvatar ? (
+                                                            <img 
+                                                                src={member.userAvatar} 
+                                                                alt={member.userName} 
+                                                                className="w-8 h-8 rounded-full object-cover" 
+                                                            />
+                                                        ) : (
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-xs font-medium text-white">
+                                                                {member.userName.split(' ').map(n => n[0]).join('')}
+                                                            </div>
+                                                        )}
                                                     <div>
                                                         <p className="text-sm font-medium text-white">{member.userName}</p>
                                                         <p className="text-xs text-slate-500">{member.userEmail}</p>

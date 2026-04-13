@@ -47,7 +47,8 @@ export default function LoginPage() {
       // If successful, redirect to dashboard
       navigate('/', { replace: true });
     } catch (err) {
-      setAuthError('Invalid credentials. Please try again.');
+      console.error('Login error detail:', err.message);
+      setAuthError(err.message || 'Invalid credentials. Please try again.');
     }
   };
 

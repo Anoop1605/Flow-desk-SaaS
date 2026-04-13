@@ -8,6 +8,7 @@ public class CommentResponse {
     private Long taskId;
     private Long authorId;
     private String authorName;
+    private String authorAvatar;
     private String content;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -16,12 +17,13 @@ public class CommentResponse {
     public CommentResponse() {
     }
 
-    public CommentResponse(Long id, Long taskId, Long authorId, String authorName,
+    public CommentResponse(Long id, Long taskId, Long authorId, String authorName, String authorAvatar,
             String content, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.taskId = taskId;
         this.authorId = authorId;
         this.authorName = authorName;
+        this.authorAvatar = authorAvatar;
         this.content = content;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -58,6 +60,14 @@ public class CommentResponse {
 
     public void setAuthorName(String authorName) {
         this.authorName = authorName;
+    }
+
+    public String getAuthorAvatar() {
+        return authorAvatar;
+    }
+
+    public void setAuthorAvatar(String authorAvatar) {
+        this.authorAvatar = authorAvatar;
     }
 
     public String getContent() {

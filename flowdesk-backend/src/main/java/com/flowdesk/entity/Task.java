@@ -37,6 +37,9 @@ public class Task {
     @Column(name = "due_date")
     private LocalDate dueDate;
 
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -64,13 +67,14 @@ public class Task {
     }
 
     public Task(String title, String description, TaskStatus status, Priority priority,
-            Long projectId, Long assigneeId, LocalDate dueDate, Organization organization) {
+            Long projectId, Long assigneeId, Long tenantId, LocalDate dueDate, Organization organization) {
         this.title = title;
         this.description = description;
         this.status = status;
         this.priority = priority;
         this.projectId = projectId;
         this.assigneeId = assigneeId;
+        this.tenantId = tenantId;
         this.dueDate = dueDate;
         this.organization = organization;
     }
@@ -138,6 +142,14 @@ public class Task {
 
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
+    }
+
+    public Long getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(Long tenantId) {
+        this.tenantId = tenantId;
     }
 
     public Organization getOrganization() {

@@ -17,9 +17,15 @@ CREATE TABLE IF NOT EXISTS projects (
     status          VARCHAR(20)     NOT NULL DEFAULT 'ACTIVE',
     color_tag       VARCHAR(20),
     owner_id        BIGINT,
+    organization_id BIGINT          NOT NULL,
     tenant_id       BIGINT          NOT NULL,
     created_at      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- Foreign Key to organizations table
+    CONSTRAINT fk_projects_organization
+        FOREIGN KEY (organization_id) REFERENCES organizations(id)
+        ON DELETE CASCADE,
 
     -- CHECK constraints for enum values
     CONSTRAINT chk_projects_status
@@ -27,6 +33,7 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 
 -- Indexes for common query patterns
+CREATE INDEX IF NOT EXISTS idx_projects_organization_id ON projects(organization_id);
 CREATE INDEX IF NOT EXISTS idx_projects_tenant_id  ON projects(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_projects_owner_id   ON projects(owner_id);
 CREATE INDEX IF NOT EXISTS idx_projects_status     ON projects(status);

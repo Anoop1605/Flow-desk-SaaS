@@ -1,5 +1,6 @@
 package com.flowdesk.controller;
 
+import com.flowdesk.dto.AcceptInviteRequest;
 import com.flowdesk.dto.AuthResponse;
 import com.flowdesk.dto.LoginRequest;
 import com.flowdesk.dto.PasswordChangeRequest;
@@ -79,6 +80,7 @@ public class AuthController {
                     .name(user.getName())
                     .role(user.getRole())
                     .organizationId(user.getOrganization() != null ? user.getOrganization().getId() : null)
+.avatar(user.getAvatar())
                     .build());
         } catch (Exception e) {
             log.error("CRITICAL ERROR during registration: {}", e.getMessage(), e);
@@ -101,6 +103,39 @@ public class AuthController {
                 .name(user.getName())
                 .role(user.getRole())
                 .organizationId(user.getOrganization() != null ? user.getOrganization().getId() : null)
+.avatar(user.getAvatar())
+                .build());
+    }
+
+    @PostMapping("/accept-invite")
+    public ResponseEntity<?> acceptInvite(@RequestBody AcceptInviteRequest request) {
+        if (request.getToken() == null || request.getToken().isBlank()) {
+            return ResponseEntity.badRequest().body("Token is required");
+        }
+        if (request.getPassword() == null || request.getPassword().length() < 6) {
+            return ResponseEntity.badRequest().body("Password must be at least 6 characters");
+        }
+        
+        java.util.Optional<User> optUser = userRepository.findByInvitationToken(request.getToken());
+        if (optUser.isEmpty()) {
+            return ResponseEntity.badRequest().body("Invalid or expired invitation token");
+        }
+
+        User user = optUser.get();
+        user.setInvitationToken(null);
+        user.setName(request.getName() != null && !request.getName().isBlank() ? request.getName() : user.getName());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        userRepository.save(user);
+
+        // Auto-login after password set
+        String token = jwtUtil.generateToken(new CustomUserDetails(user));
+        return ResponseEntity.ok(AuthResponse.builder()
+                .token(token)
+                .email(user.getEmail())
+                .name(user.getName())
+                .role(user.getRole())
+                .organizationId(user.getOrganization() != null ? user.getOrganization().getId() : null)
+.avatar(user.getAvatar())
                 .build());
     }
 
@@ -117,6 +152,7 @@ public class AuthController {
                 .name(user.getName())
                 .role(user.getRole())
                 .organizationId(user.getOrganization() != null ? user.getOrganization().getId() : null)
+.avatar(user.getAvatar())
                 .build());
     }
 
@@ -138,6 +174,9 @@ public class AuthController {
         }
 
         user.setName(fullName);
+        if (request.getAvatar() != null && !request.getAvatar().isEmpty()) {
+            user.setAvatar(request.getAvatar());
+        }
         userRepository.save(user);
 
         return ResponseEntity.ok(AuthResponse.builder()
@@ -145,6 +184,7 @@ public class AuthController {
                 .name(user.getName())
                 .role(user.getRole())
                 .organizationId(user.getOrganization() != null ? user.getOrganization().getId() : null)
+.avatar(user.getAvatar())
                 .build());
     }
 

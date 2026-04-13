@@ -7,34 +7,42 @@ import com.flowdesk.entity.User;
 import com.flowdesk.enums.GlobalRole;
 import com.flowdesk.repository.TeamMemberRepository;
 import com.flowdesk.repository.UserRepository;
+import com.flowdesk.repository.OrganizationRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
- * TeamServiceImpl — Member 2
- * Stub implementation for Phase 1. Controller returns mock data directly.
- * Phase 2: will implement full team management with invite-by-email.
+ * TeamServiceImpl — Full team management with real email invitations
+ * Sends invitation emails when members are invited to the organization.
  */
 @Service
 public class TeamServiceImpl implements TeamService {
 
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
+    private final OrganizationRepository organizationRepository;
     private final PasswordEncoder passwordEncoder;
     private final ActivityLogService activityLogService;
+    private final EmailService emailService;
 
     public TeamServiceImpl(
             TeamMemberRepository teamMemberRepository,
             UserRepository userRepository,
+            OrganizationRepository organizationRepository,
             PasswordEncoder passwordEncoder,
-            ActivityLogService activityLogService) {
+            ActivityLogService activityLogService,
+            EmailService emailService) {
         this.teamMemberRepository = teamMemberRepository;
         this.userRepository = userRepository;
+        this.organizationRepository = organizationRepository;
         this.passwordEncoder = passwordEncoder;
         this.activityLogService = activityLogService;
+        this.emailService = emailService;
     }
 
     @Override
@@ -45,6 +53,37 @@ public class TeamServiceImpl implements TeamService {
     }
 
     @Override
+    public TeamMemberResponse updateOrganizationRole(Long organizationId, Long userId, String role) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (user.getOrganization() == null || !user.getOrganization().getId().equals(organizationId)) {
+            throw new RuntimeException("User does not belong to this organization");
+        }
+        
+        GlobalRole newRole = mapInviteRole(role);
+        user.setRole(newRole);
+        user = userRepository.save(user);
+        return mapUserToTeamResponse(user);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void removeOrganizationMember(Long organizationId, Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (user.getOrganization() == null || !user.getOrganization().getId().equals(organizationId)) {
+            throw new RuntimeException("User does not belong to this organization");
+        }
+        
+        // Let's set organization to null to logically detach without breaking task assignees/creators
+        user.setOrganization(null);
+        userRepository.save(user);
+    }
+
+    private static final String EMAIL_REGEX = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[a-z]+$";
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(EMAIL_REGEX);
+
+    @Override
     public TeamMemberResponse inviteMemberByEmail(String email, String role, Long organizationId, Long actorUserId,
             String actorUserName) {
         if (email == null || email.isBlank()) {
@@ -52,7 +91,15 @@ public class TeamServiceImpl implements TeamService {
         }
 
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+        
+        if (!EMAIL_PATTERN.matcher(normalizedEmail).matches()) {
+            throw new RuntimeException("Invalid email format");
+        }
+
         GlobalRole targetRole = mapInviteRole(role);
+        
+        String invitationToken = java.util.UUID.randomUUID().toString();
+        String securePlaceholderPassword = java.util.UUID.randomUUID().toString();
 
         User user = userRepository.findByEmail(normalizedEmail)
                 .map(existing -> {
@@ -61,6 +108,7 @@ public class TeamServiceImpl implements TeamService {
                         throw new RuntimeException("This email belongs to another organization");
                     }
                     existing.setRole(targetRole);
+                    existing.setInvitationToken(invitationToken);
                     return userRepository.save(existing);
                 })
                 .orElseGet(() -> {
@@ -73,11 +121,23 @@ public class TeamServiceImpl implements TeamService {
                     User created = new User();
                     created.setEmail(normalizedEmail);
                     created.setName(displayName);
-                    created.setPassword(passwordEncoder.encode("TempPassword@123"));
+                    created.setPassword(passwordEncoder.encode(securePlaceholderPassword));
                     created.setRole(targetRole);
                     created.setOrganization(org);
+                    created.setInvitationToken(invitationToken);
                     return userRepository.save(created);
                 });
+
+        // Send invitation email with organization name
+        Organization org = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new RuntimeException("Organization not found"));
+        
+        emailService.sendInvitationEmail(
+                normalizedEmail,
+                actorUserName,
+                org.getName() != null ? org.getName() : "Our Team",
+                invitationToken
+        );
 
         activityLogService.log(
                 "MEMBER_INVITED",
@@ -88,7 +148,11 @@ public class TeamServiceImpl implements TeamService {
                 user.getId(),
                 "USER");
 
-        return mapUserToTeamResponse(user);
+        TeamMemberResponse response = mapUserToTeamResponse(user);
+        response.setTempPassword(null);
+        response.setLoginLink(null);
+
+        return response;
     }
 
     @Override
@@ -140,6 +204,7 @@ public class TeamServiceImpl implements TeamService {
         userRepository.findById(member.getUserId()).ifPresent(user -> {
             response.setUserName(user.getName());
             response.setUserEmail(user.getEmail());
+            response.setUserAvatar(user.getAvatar());
         });
 
         return response;
@@ -150,10 +215,21 @@ public class TeamServiceImpl implements TeamService {
         response.setId(user.getId());
         response.setUserId(user.getId());
         response.setUserName(user.getName());
+        response.setUserAvatar(user.getAvatar());
         response.setUserEmail(user.getEmail());
         response.setRoleInProject(user.getRole().name());
         response.setJoinedAt(user.getCreatedAt());
         return response;
+    }
+
+    private String generateRandomPassword() {
+        final String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(10);
+        for (int i = 0; i < 10; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 
     private GlobalRole mapInviteRole(String role) {

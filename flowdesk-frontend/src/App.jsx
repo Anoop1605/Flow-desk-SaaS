@@ -1,5 +1,5 @@
-import { BrowserRouter, Routes, Route, NavLink, useLocation, Outlet, Link } from 'react-router-dom';
-import { LayoutDashboard, KanbanSquare, CheckSquare, Search, Menu, X, Bell, UserCircle, Activity, FolderKanban, Users } from 'lucide-react';
+import { BrowserRouter, Routes, Route, NavLink, useLocation, Outlet, Link, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, KanbanSquare, CheckSquare, Search, Menu, X, Bell, UserCircle, Activity, FolderKanban, Users, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Toaster } from 'sonner';
@@ -13,6 +13,7 @@ import TaskDetailDrawer from './components/TaskDetailDrawer';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import AcceptInvitePage from './pages/AcceptInvitePage';
 import ProfilePage from './pages/ProfilePage';
 import ActivityLogPage from './pages/ActivityLogPage';
 import ProjectsListPage from './pages/ProjectsListPage';
@@ -25,20 +26,27 @@ import { activityApi, taskApi, queryKeys } from './lib/api';
 import { toast } from 'sonner';
 
 function Sidebar({ isOpen, setIsOpen }) {
-  // ... rest remains same until DashboardLayout
-
+  const location = useLocation();
   const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
 
   const lastProjectId = useUIStore((s) => s.lastProjectId);
-  const navLinks = [
+  const baseNavLinks = [
     { name: 'Dashboard', to: '/', icon: LayoutDashboard },
     { name: 'Projects', to: '/projects', icon: FolderKanban },
     { name: 'Team', to: '/team', icon: Users },
-    { name: 'Kanban Board', to: lastProjectId ? `/projects/${lastProjectId}/board` : '/projects', icon: KanbanSquare },
     { name: 'My Tasks', to: '/my-tasks', icon: CheckSquare },
     { name: 'Profile', to: '/profile', icon: UserCircle },
     { name: 'Activity', to: '/activity', icon: Activity },
   ];
+  
+  // Only show Kanban Board when a project is selected
+  const navLinks = lastProjectId
+    ? [
+        ...baseNavLinks.slice(0, 3),
+        { name: 'Kanban Board', to: `/projects/${lastProjectId}/board`, icon: KanbanSquare },
+        ...baseNavLinks.slice(3),
+      ]
+    : baseNavLinks;
 
   return (
     <>
@@ -90,36 +98,38 @@ function Sidebar({ isOpen, setIsOpen }) {
         </div>
 
         <nav className="flex-1 px-4 space-y-1">
-          {navLinks.map((link) => (
-            <NavLink
+          {navLinks.map((link) => {
+            const isActive = 
+              link.name === 'Dashboard' ? location.pathname === '/' 
+              : link.name === 'Projects' ? (location.pathname === '/projects' || (location.pathname.startsWith('/projects') && !location.pathname.includes('/board')))
+              : location.pathname.startsWith(link.to);
+
+            return (
+            <Link
               key={link.to}
               to={link.to}
-              className={({ isActive }) => cn(
+              className={cn(
                 "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300",
                 isActive ? "text-indigo-300 bg-indigo-500/10" : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
               )}
             >
-              {({ isActive }) => (
-                <>
-                  <link.icon
-                    size={18}
-                    className={cn(
-                      "transition-colors duration-300",
-                      isActive ? "text-indigo-400" : "text-slate-500 group-hover:text-slate-300"
-                    )}
-                  />
-                  <span>{link.name}</span>
-                  {isActive && (
-                    <motion.div
-                      layoutId="active-nav-indicator"
-                      className="absolute left-0 w-1 h-5 bg-indigo-500 rounded-r-full"
-                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    />
-                  )}
-                </>
+              <link.icon
+                size={18}
+                className={cn(
+                  "transition-colors duration-300",
+                  isActive ? "text-indigo-400" : "text-slate-500 group-hover:text-slate-300"
+                )}
+              />
+              <span>{link.name}</span>
+              {isActive && (
+                <motion.div
+                  layoutId="active-nav-indicator"
+                  className="absolute left-0 w-1 h-5 bg-indigo-500 rounded-r-full"
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                />
               )}
-            </NavLink>
-          ))}
+            </Link>
+          )})}
         </nav>
       </motion.aside>
     </>
@@ -127,11 +137,20 @@ function Sidebar({ isOpen, setIsOpen }) {
 }
 
 function Topbar({ setSidebarOpen }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [hasViewedNotifications, setHasViewedNotifications] = useState(false);
   const initials = user?.name 
     ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : '??';
+
+  const handleLogout = () => {
+    logout();
+    setIsProfileMenuOpen(false);
+    navigate('/login');
+  };
 
   const { data: notifications = [] } = useQuery({
     queryKey: ['topbar-notifications'],
@@ -151,12 +170,15 @@ function Topbar({ setSidebarOpen }) {
       <div className="flex items-center gap-4">
         <div className="relative">
           <button
-            onClick={() => setIsNotificationsOpen((prev) => !prev)}
+            onClick={() => {
+              setIsNotificationsOpen((prev) => !prev);
+              setHasViewedNotifications(true);
+            }}
             className="relative w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/5 hover:text-white transition-colors"
             aria-label="Open notifications"
           >
             <Bell size={18} />
-            {notifications.length > 0 && (
+            {notifications.length > 0 && !hasViewedNotifications && (
               <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 border border-surface-primary"></span>
             )}
           </button>
@@ -164,7 +186,7 @@ function Topbar({ setSidebarOpen }) {
           {isNotificationsOpen && (
             <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-white/[0.08] bg-surface-primary/95 shadow-2xl backdrop-blur-xl p-3 z-50">
               <div className="flex items-center justify-between px-2 py-1 mb-1">
-                <p className="text-sm font-semibold text-white">Notifications</p>
+                <p className="text-sm font-semibold text-white">Recent Activity</p>
                 <Link
                   to="/activity"
                   onClick={() => setIsNotificationsOpen(false)}
@@ -189,9 +211,47 @@ function Topbar({ setSidebarOpen }) {
             </div>
           )}
         </div>
-        <Link to="/profile" className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-sm font-medium text-white shadow-glow-sm cursor-pointer border border-white/[0.08] hover:shadow-glow-md transition-shadow">
-          {initials}
-        </Link>
+        <div className="relative">
+          <button
+            onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+            className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-sm font-medium text-white shadow-glow-sm cursor-pointer border border-white/[0.08] hover:shadow-glow-md transition-shadow shrink-0 overflow-hidden"
+            title="Profile Menu"
+          >
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user?.name || 'User'}
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : (
+              initials
+            )}
+          </button>
+
+          {isProfileMenuOpen && (
+            <div className="absolute right-0 mt-2 w-48 rounded-xl border border-white/[0.08] bg-surface-primary/95 shadow-2xl backdrop-blur-xl p-2 z-50">
+              <div className="px-3 py-2 border-b border-white/[0.08] mb-2">
+                <p className="text-sm font-semibold text-white">{user?.name}</p>
+                <p className="text-xs text-slate-400">{user?.email}</p>
+              </div>
+              <Link
+                to="/profile"
+                onClick={() => setIsProfileMenuOpen(false)}
+                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-white/5 transition-colors"
+              >
+                <UserCircle size={16} />
+                View Profile
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-rose-300 hover:bg-rose-500/10 transition-colors"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
@@ -283,6 +343,7 @@ export default function App() {
           {/* PUBLIC ROUTES (No Sidebar) */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
           {/* PRIVATE ROUTES (Wrapped in DashboardLayout AND ProtectedRoute) */}
           <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>

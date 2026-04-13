@@ -14,6 +14,7 @@ public class ProjectResponse {
     private String colorTag;
     private Long ownerId;
     private String ownerName;
+    private String ownerAvatar;
     private int memberCount;
     private int taskCount;
     private LocalDateTime createdAt;
@@ -23,7 +24,7 @@ public class ProjectResponse {
     }
 
     public ProjectResponse(Long id, String name, String description, String status,
-                           String colorTag, Long ownerId, String ownerName,
+                           String colorTag, Long ownerId, String ownerName, String ownerAvatar,
                            int memberCount, int taskCount,
                            LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
@@ -33,6 +34,7 @@ public class ProjectResponse {
         this.colorTag = colorTag;
         this.ownerId = ownerId;
         this.ownerName = ownerName;
+        this.ownerAvatar = ownerAvatar;
         this.memberCount = memberCount;
         this.taskCount = taskCount;
         this.createdAt = createdAt;
@@ -60,6 +62,9 @@ public class ProjectResponse {
 
     public String getOwnerName() { return ownerName; }
     public void setOwnerName(String ownerName) { this.ownerName = ownerName; }
+
+    public String getOwnerAvatar() { return ownerAvatar; }
+    public void setOwnerAvatar(String ownerAvatar) { this.ownerAvatar = ownerAvatar; }
 
     public int getMemberCount() { return memberCount; }
     public void setMemberCount(int memberCount) { this.memberCount = memberCount; }

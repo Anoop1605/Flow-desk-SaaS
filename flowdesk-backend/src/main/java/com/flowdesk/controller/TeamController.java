@@ -41,4 +41,26 @@ public class TeamController {
 
         return ResponseEntity.ok(response);
     }
+
+    @PutMapping("/members/{userId}/role")
+    public ResponseEntity<TeamMemberResponse> updateMemberRole(
+            @PathVariable Long userId,
+            @RequestBody java.util.Map<String, String> payload,
+            Authentication authentication) {
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Long orgId = userDetails.getUser().getOrganization().getId();
+        
+        String role = payload.getOrDefault("role", "MEMBER");
+        TeamMemberResponse response = teamService.updateOrganizationRole(orgId, userId, role);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/members/{userId}")
+    public ResponseEntity<Void> removeMember(@PathVariable Long userId, Authentication authentication) {
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+        Long orgId = userDetails.getUser().getOrganization().getId();
+        
+        teamService.removeOrganizationMember(orgId, userId);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -3,7 +3,9 @@ package com.flowdesk.service;
 import com.flowdesk.dto.ProjectCreateRequest;
 import com.flowdesk.dto.ProjectResponse;
 import com.flowdesk.entity.Project;
+import com.flowdesk.entity.User;
 import com.flowdesk.repository.ProjectRepository;
+import com.flowdesk.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,10 +19,12 @@ public class ProjectServiceImpl implements ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ActivityLogService activityLogService;
+    private final UserRepository userRepository;
 
-    public ProjectServiceImpl(ProjectRepository projectRepository, ActivityLogService activityLogService) {
+    public ProjectServiceImpl(ProjectRepository projectRepository, ActivityLogService activityLogService, UserRepository userRepository) {
         this.projectRepository = projectRepository;
         this.activityLogService = activityLogService;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -59,6 +63,7 @@ public class ProjectServiceImpl implements ProjectService {
         project.setDescription(request.getDescription());
         project.setColorTag(request.getColorTag());
         project.setOwnerId(userId);
+        project.setTenantId(organizationId);
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             project.setStatus(com.flowdesk.enums.ProjectStatus.valueOf(request.getStatus().toUpperCase()));
         }
@@ -124,6 +129,14 @@ public class ProjectServiceImpl implements ProjectService {
         response.setStatus(project.getStatus().name());
         response.setColorTag(project.getColorTag());
         response.setOwnerId(project.getOwnerId());
+        
+        if (project.getOwnerId() != null) {
+            userRepository.findById(project.getOwnerId()).ifPresent(user -> {
+                response.setOwnerName(user.getName());
+                response.setOwnerAvatar(user.getAvatar());
+            });
+        }
+        
         response.setCreatedAt(project.getCreatedAt());
         response.setUpdatedAt(project.getUpdatedAt());
         return response;

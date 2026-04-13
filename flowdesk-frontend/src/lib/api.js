@@ -92,6 +92,8 @@ export const taskApi = {
 export const teamApi = {
     getMembers: () => api.get('/api/team/members'),
     invite: (data) => api.post('/api/team/invite', data),
+    updateRole: (userId, data) => api.put(`/api/team/members/${userId}/role`, data),
+    removeMember: (userId) => api.delete(`/api/team/members/${userId}`),
 };
 // 5. QUERY KEYS — Centralized for TanStack Query
 // WHY: Every useQuery call needs a key. Defining them here means

@@ -10,18 +10,24 @@ public class TeamMemberResponse {
     private Long id;
     private Long userId;
     private String userName;
+    private String userAvatar;
     private String userEmail;
     private String roleInProject;
     private LocalDateTime joinedAt;
+    
+    // For handling newly invited users
+    private String tempPassword;
+    private String loginLink;
 
     public TeamMemberResponse() {
     }
 
-    public TeamMemberResponse(Long id, Long userId, String userName, String userEmail,
+    public TeamMemberResponse(Long id, Long userId, String userName, String userAvatar, String userEmail,
                               String roleInProject, LocalDateTime joinedAt) {
         this.id = id;
         this.userId = userId;
         this.userName = userName;
+        this.userAvatar = userAvatar;
         this.userEmail = userEmail;
         this.roleInProject = roleInProject;
         this.joinedAt = joinedAt;
@@ -36,6 +42,9 @@ public class TeamMemberResponse {
 
     public String getUserName() { return userName; }
     public void setUserName(String userName) { this.userName = userName; }
+    
+    public String getUserAvatar() { return userAvatar; }
+    public void setUserAvatar(String userAvatar) { this.userAvatar = userAvatar; }
 
     public String getUserEmail() { return userEmail; }
     public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
@@ -45,4 +54,10 @@ public class TeamMemberResponse {
 
     public LocalDateTime getJoinedAt() { return joinedAt; }
     public void setJoinedAt(LocalDateTime joinedAt) { this.joinedAt = joinedAt; }
+
+    public String getTempPassword() { return tempPassword; }
+    public void setTempPassword(String tempPassword) { this.tempPassword = tempPassword; }
+
+    public String getLoginLink() { return loginLink; }
+    public void setLoginLink(String loginLink) { this.loginLink = loginLink; }
 }

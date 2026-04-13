@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Plus, Search, Users, CheckSquare, FolderKanban,
-    MoreHorizontal, ArrowUpRight, Filter
+    ArrowUpRight, Filter
 } from 'lucide-react';
 import { queryKeys, projectApi } from '../lib/api';
 import { fadeUp, staggerContainer, cardVariant } from '../lib/animations';
@@ -77,9 +77,13 @@ function ProjectCard({ project }) {
 
                 {/* Owner */}
                 <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-[9px] font-medium text-white">
-                        {project.ownerName ? project.ownerName.split(' ').map(n => n[0]).join('') : 'U'}
-                    </div>
+                    {project.ownerAvatar ? (
+                        <img src={project.ownerAvatar} alt={project.ownerName} className="w-5 h-5 rounded-full object-cover shadow-sm" />
+                    ) : (
+                        <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-[9px] font-medium text-white shadow-sm">
+                            {project.ownerName ? project.ownerName.split(' ').map(n => n[0]).join('') : 'U'}
+                        </div>
+                    )}
                     <span className="text-xs text-slate-500">{project.ownerName || 'Unknown Owner'}</span>
                 </div>
             </Link>

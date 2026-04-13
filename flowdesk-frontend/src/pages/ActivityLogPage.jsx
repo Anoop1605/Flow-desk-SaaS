@@ -141,6 +141,7 @@ export default function ActivityLogPage() {
           fullDescription: entry.description || '',
           actor: {
             name: entry.userName || 'Unknown User',
+              avatar: entry.userAvatar || null,
             initials: (entry.userName
               ? entry.userName
                   .split(' ')
@@ -310,8 +311,11 @@ export default function ActivityLogPage() {
                         <div className="flex-1 min-w-0 pb-6">
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <Avatar.Root className="shrink-0">
-                                <Avatar.Fallback
+                              <Avatar.Root className="shrink-0">                                  <Avatar.Image
+                                    src={activity.actor.avatar}
+                                    alt={activity.actor.name}
+                                    className="w-7 h-7 rounded-full object-cover"
+                                  />                                <Avatar.Fallback
                                   delayMs={0}
                                   className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-500/60 to-violet-600/60 flex items-center justify-center text-white text-[10px] font-bold"
                                 >

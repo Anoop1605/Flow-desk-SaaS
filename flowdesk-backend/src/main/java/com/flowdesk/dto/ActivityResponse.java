@@ -8,6 +8,7 @@ public class ActivityResponse {
     private String description;
     private Long userId;
     private String userName;
+    private String userAvatar;
     private Long entityId;
     private String entityType;
     private LocalDateTime createdAt;
@@ -50,6 +51,14 @@ public class ActivityResponse {
 
     public void setUserName(String userName) {
         this.userName = userName;
+    }
+
+    public String getUserAvatar() {
+        return userAvatar;
+    }
+
+    public void setUserAvatar(String userAvatar) {
+        this.userAvatar = userAvatar;
     }
 
     public Long getEntityId() {

@@ -233,12 +233,21 @@ export default function MyTasksPage() {
 
                                 {/* Assignee Avatar */}
                                 {task.assignee && (
-                                    <div
-                                        className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-2 ring-surface-primary flex-shrink-0"
-                                        title={task.assignee.name}
-                                    >
-                                        {task.assignee.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
-                                    </div>
+                                    task.assignee.avatar ? (
+                                        <img
+                                            src={task.assignee.avatar}
+                                            alt={task.assignee.name}
+                                            title={task.assignee.name}
+                                            className="w-7 h-7 rounded-full object-cover flex-shrink-0 shadow-sm ring-2 ring-surface-primary"
+                                        />
+                                    ) : (
+                                        <div
+                                            className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm ring-2 ring-surface-primary flex-shrink-0"
+                                            title={task.assignee.name}
+                                        >
+                                            {task.assignee.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                                        </div>
+                                    )
                                 )}
                             </motion.div>
                         );

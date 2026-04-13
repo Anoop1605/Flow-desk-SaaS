@@ -33,6 +33,9 @@ public class Project {
     @Column(name = "owner_id")
     private Long ownerId;
 
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", nullable = false)
     private Organization organization;
@@ -60,12 +63,13 @@ public class Project {
     }
 
     public Project(String name, String description, ProjectStatus status,
-                   String colorTag, Long ownerId, Organization organization) {
+                   String colorTag, Long ownerId, Long tenantId, Organization organization) {
         this.name = name;
         this.description = description;
         this.status = status;
         this.colorTag = colorTag;
         this.ownerId = ownerId;
+        this.tenantId = tenantId;
         this.organization = organization;
     }
 
@@ -116,6 +120,14 @@ public class Project {
 
     public void setOwnerId(Long ownerId) {
         this.ownerId = ownerId;
+    }
+
+    public Long getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(Long tenantId) {
+        this.tenantId = tenantId;
     }
 
     public Organization getOrganization() {

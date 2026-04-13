@@ -1,14 +1,15 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
     DragOverlay,
-    closestCorners,
+    closestCenter,
     KeyboardSensor,
     PointerSensor,
     useSensor,
     useSensors,
+    useDroppable,
     defaultDropAnimationSideEffects,
 } from '@dnd-kit/core';
 import {
@@ -32,6 +33,50 @@ const COLUMNS = [
     { id: 'DONE', title: 'Done', borderClass: 'border-emerald-500/30', headerClass: 'bg-emerald-500/10 text-emerald-400' },
 ];
 
+function DroppableColumn({ id, title, headerClass, colTasks, onAddTask }) {
+    const { setNodeRef } = useDroppable({
+        id: id,
+        data: {
+            type: 'Column',
+            columnId: id
+        }
+    });
+
+    return (
+        <div className="flex flex-col rounded-2xl bg-surface-primary/40 border border-white/[0.04] backdrop-blur-xl">
+            <div className={cn("px-4 py-3 border-b border-white/[0.04] flex items-center justify-between", headerClass, "rounded-t-2xl bg-opacity-50")}>
+                <h3 className="text-sm font-semibold tracking-wide uppercase">{title}</h3>
+                <span className="w-6 h-6 rounded-full bg-black/20 flex items-center justify-center text-xs font-bold text-white">
+                    {colTasks.length}
+                </span>
+            </div>
+
+            <SortableContext items={colTasks.map(t => String(t.id))} strategy={verticalListSortingStrategy}>
+                <div ref={setNodeRef} className="flex-1 p-3 min-h-[500px] flex flex-col gap-3">
+                    {colTasks.length === 0 ? (
+                        <div className="flex items-center justify-center py-12 text-slate-500">
+                            <p className="text-sm">No tasks yet</p>
+                        </div>
+                    ) : (
+                        colTasks.map((task) => (
+                            <TaskCard key={task.id} task={task} />
+                        ))
+                    )}
+
+                    <RoleGuard allowedRoles={['ORGANIZATION_OWNER', 'ORGANIZATION_MEMBER']}>
+                        <button
+                            onClick={onAddTask}
+                            className="mt-2 w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-white/10 text-sm font-medium text-slate-400 hover:text-indigo-300 hover:border-indigo-500/30 hover:bg-indigo-500/10 transition-all group"
+                        >
+                            <Plus size={16} className="group-hover:scale-110 transition-transform" /> Add Task
+                        </button>
+                    </RoleGuard>
+                </div>
+            </SortableContext>
+        </div>
+    );
+}
+
 export default function KanbanBoard() {
     const { id: projectId } = useParams();
     const queryClient = useQueryClient();
@@ -53,23 +98,16 @@ export default function KanbanBoard() {
         gcTime: 0,
     });
 
-    // ── Flatten tasks for local state (Optimistic Updates) ──
+    // ── Flatten tasks for DnD tracking (Derived from responseData) ──
     // Because the API returns { tasks: { TODO: [...], IN_PROGRESS: [...] } }
     // we flatten it to a single array for easier DnD tracking.
-    const [localTasks, setLocalTasks] = useState([]);
-
-    useEffect(() => {
-        if (!responseData?.tasks) {
-            setLocalTasks([]);
-            return;
-        }
-
-        const all = [
+    const localTasks = useMemo(() => {
+        if (!responseData?.tasks) return [];
+        return [
             ...(responseData.tasks.TODO || []),
             ...(responseData.tasks.IN_PROGRESS || []),
             ...(responseData.tasks.DONE || []),
         ];
-        setLocalTasks(all);
     }, [responseData]);
 
     // ── Group tasks by column ──
@@ -110,23 +148,52 @@ export default function KanbanBoard() {
     // ── Persistence Mutations ──
     const updateStatusMutation = useMutation({
         mutationFn: ({ taskId, newStatus }) => taskApi.updateStatus(taskId, newStatus),
+        onMutate: async ({ taskId, newStatus }) => {
+            await queryClient.cancelQueries({ queryKey: queryKeys.tasks(projectId) });
+            const previousData = queryClient.getQueryData(queryKeys.tasks(projectId));
+            
+            if (previousData?.tasks) {
+                queryClient.setQueryData(queryKeys.tasks(projectId), (old) => {
+                    if (!old?.tasks) return old;
+                    const newTasks = { ...old.tasks };
+                    let taskToMove = null;
+                    
+                    Object.keys(newTasks).forEach(status => {
+                        if (!newTasks[status]) return;
+                        const idx = newTasks[status].findIndex(t => String(t.id) === String(taskId));
+                        if (idx >= 0) {
+                            taskToMove = newTasks[status][idx];
+                            newTasks[status] = [...newTasks[status]];
+                            newTasks[status].splice(idx, 1);
+                        }
+                    });
+                    
+                    if (taskToMove && newStatus) {
+                        taskToMove = { ...taskToMove, status: newStatus };
+                        if (!newTasks[newStatus]) newTasks[newStatus] = [];
+                        newTasks[newStatus] = [...newTasks[newStatus], taskToMove];
+                    }
+                    
+                    return { ...old, tasks: newTasks };
+                });
+            }
+            return { previousData };
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.myTasks });
             queryClient.invalidateQueries({ queryKey: queryKeys.dashboard });
             queryClient.invalidateQueries({ queryKey: ['activity'] });
             queryClient.invalidateQueries({ queryKey: ['topbar-notifications'] });
-            // Refetch to ensure UI is in sync
-            setTimeout(() => refetch(), 100);
         },
-        onError: (err) => {
+        onError: (err, variables, context) => {
+            if (context?.previousData) {
+                queryClient.setQueryData(queryKeys.tasks(projectId), context.previousData);
+            }
             toast.error("Failed to update task status", {
                 description: err?.response?.data?.message || err?.message || 'Please try again',
             });
             console.error(err);
-            // Revert local state on error by refetching
-            queryClient.invalidateQueries({ queryKey: queryKeys.tasks(projectId) });
-            setTimeout(() => refetch(), 100);
         }
     });
 
@@ -159,28 +226,42 @@ export default function KanbanBoard() {
 
         const activeId = String(active.id);
         const overId = String(over.id);
+        const activeData = active.data.current;
+        const overData = over.data.current;
 
-        const activeCol = findColumn(activeId);
-        const overCol = findColumn(overId);
+        // Determine source and target columns
+        let activeCol = null;
+        let overCol = null;
+
+        // Check if active is a task or column
+        if (activeData?.type === 'Task') {
+            activeCol = activeData.task?.status;
+        } else {
+            activeCol = activeId;
+        }
+
+        // Check if over is a task or column
+        if (overData?.type === 'Task') {
+            overCol = overData.task?.status;
+        } else if (['TODO', 'IN_PROGRESS', 'DONE'].includes(overId)) {
+            overCol = overId;
+        } else {
+            overCol = findColumn(overId);
+        }
 
         // Only update if moving to a different column
         if (activeCol && overCol && activeCol !== overCol && ['TODO', 'IN_PROGRESS', 'DONE'].includes(overCol)) {
             const task = localTasks.find(t => String(t.id) === activeId);
             if (!task) return;
-
-            // Optimistic UI update
-            setLocalTasks(prev =>
-                prev.map(t => String(t.id) === activeId ? { ...t, status: overCol } : t)
-            );
             
-            // Persist to DB
+            // Persist to DB (UI updates via TanStack Query invalidation)
             updateStatusMutation.mutate({ taskId: activeId, newStatus: overCol });
             
             toast.success(`Moved to ${COLUMNS.find(c => c.id === overCol)?.title}`, {
                 description: task?.title || 'Task updated'
             });
         }
-    }, [findColumn, localTasks, setLocalTasks, updateStatusMutation]);
+    }, [findColumn, localTasks, updateStatusMutation]);
 
     const dropAnimation = {
         sideEffects: defaultDropAnimationSideEffects({
@@ -228,51 +309,25 @@ export default function KanbanBoard() {
 
             <DndContext
                 sensors={sensors}
-                collisionDetection={closestCorners}
+                collisionDetection={closestCenter}
                 onDragStart={handleDragStart}
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
             >
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                    {COLUMNS.map((col) => {
-                        const colTasks = columns[col.id];
-                        return (
-                            <div key={col.id} className="flex flex-col rounded-2xl bg-surface-primary/40 border border-white/[0.04] backdrop-blur-xl">
-                                <div className={cn("px-4 py-3 border-b border-white/[0.04] flex items-center justify-between", col.headerClass, "rounded-t-2xl bg-opacity-50")}>
-                                    <h3 className="text-sm font-semibold tracking-wide uppercase">{col.title}</h3>
-                                    <span className="w-6 h-6 rounded-full bg-black/20 flex items-center justify-center text-xs font-bold text-white">
-                                        {colTasks.length}
-                                    </span>
-                                </div>
-
-                                <SortableContext items={[col.id, ...colTasks.map(t => String(t.id))]} strategy={verticalListSortingStrategy}>
-                                    <div className="flex-1 p-3 min-h-[500px] flex flex-col gap-3">
-                                        {colTasks.length === 0 ? (
-                                            <div className="flex items-center justify-center py-12 text-slate-500">
-                                                <p className="text-sm">No tasks yet</p>
-                                            </div>
-                                        ) : (
-                                            colTasks.map((task) => (
-                                                <TaskCard key={task.id} task={task} />
-                                            ))
-                                        )}
-
-                                        <RoleGuard allowedRoles={['ORGANIZATION_OWNER', 'ORGANIZATION_MEMBER']}>
-                                            <button
-                                                onClick={() => {
-                                                    setModalDefaultStatus(col.id);
-                                                    setModalOpen(true);
-                                                }}
-                                                className="mt-2 w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-white/10 text-sm font-medium text-slate-400 hover:text-indigo-300 hover:border-indigo-500/30 hover:bg-indigo-500/10 transition-all group"
-                                            >
-                                                <Plus size={16} className="group-hover:scale-110 transition-transform" /> Add Task
-                                            </button>
-                                        </RoleGuard>
-                                    </div>
-                                </SortableContext>
-                            </div>
-                        );
-                    })}
+                    {COLUMNS.map((col) => (
+                        <DroppableColumn 
+                            key={col.id}
+                            id={col.id}
+                            title={col.title}
+                            headerClass={col.headerClass}
+                            colTasks={columns[col.id]}
+                            onAddTask={() => {
+                                setModalDefaultStatus(col.id);
+                                setModalOpen(true);
+                            }}
+                        />
+                    ))}
                 </div>
 
                 <DragOverlay dropAnimation={dropAnimation}>

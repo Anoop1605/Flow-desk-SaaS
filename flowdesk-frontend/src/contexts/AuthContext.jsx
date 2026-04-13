@@ -81,6 +81,13 @@ export function AuthProvider({ children }) {
       setAuth(token, user);
     } catch (err) {
       console.error('Login failed:', err);
+      if (err.response?.status === 400) {
+        console.error('400 Bad Request - Details:', err.response.data);
+        throw new Error(err.response.data?.message || 'Invalid email or password');
+      }
+      if (err.response?.status === 401) {
+        throw new Error('Invalid email or password');
+      }
       throw err;
     }
   }, [setAuth]);

@@ -58,4 +58,27 @@ context.md
 *.docx 
 *.pdf
 *.txt
+# Secrets and Env
+application-secret.properties
+*.env
+.env*
+*password*
+*secret*
+.pg_pass
+
+# Setup scripts containing credentials
+*.bat
+*.sh
+*.sql
+*.conf
+*.bak
+*.backup_*
+
+# Editor/Temp crap
+setFormData({
+state.setAuth)
+{
+
+# Logs
+*.log
  

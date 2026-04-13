@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import com.flowdesk.repository.UserRepository;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class ActivityController {
 
     private final ActivityLogService activityLogService;
+    private final UserRepository userRepository;
 
     @GetMapping
     public ResponseEntity<List<ActivityResponse>> getActivityFeed(
@@ -49,6 +51,11 @@ public class ActivityController {
         response.setDescription(log.getDescription());
         response.setUserId(log.getUserId());
         response.setUserName(log.getUserName());
+        
+        userRepository.findById(log.getUserId()).ifPresent(user -> {
+            response.setUserAvatar(user.getAvatar());
+        });
+
         response.setEntityId(log.getEntityId());
         response.setEntityType(log.getEntityType());
         response.setCreatedAt(log.getCreatedAt());

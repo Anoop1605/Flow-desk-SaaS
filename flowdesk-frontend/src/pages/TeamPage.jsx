@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useState } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { toast } from 'sonner';
 import {
-    Search, UserPlus, Users, Shield, Mail, MoreHorizontal, Crown
+    Search, UserPlus, Users, Shield, Mail, Crown, MoreHorizontal, UserMinus, ShieldAlert
 } from 'lucide-react';
 import { teamApi } from '../lib/api';
 import { fadeUp, staggerContainer } from '../lib/animations';
@@ -47,6 +49,28 @@ export default function TeamPage() {
             queryClient.invalidateQueries({ queryKey: ['activity'] });
             queryClient.invalidateQueries({ queryKey: ['topbar-notifications'] });
         },
+    });
+
+    const removeMemberMutation = useMutation({
+        mutationFn: (userId) => teamApi.removeMember(userId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['team-members'] });
+            toast.success("Member removed successfully");
+        },
+        onError: (err) => {
+            toast.error(err.response?.data?.message || "Failed to remove member");
+        }
+    });
+
+    const updateRoleMutation = useMutation({
+        mutationFn: ({ userId, role }) => teamApi.updateRole(userId, { role }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['team-members'] });
+            toast.success("Role updated successfully");
+        },
+        onError: (err) => {
+            toast.error(err.response?.data?.message || "Failed to update role");
+        }
     });
 
     const filtered = (members || []).filter((m) =>
@@ -165,12 +189,20 @@ export default function TeamPage() {
                                 >
                                     {/* Member Info */}
                                     <div className="col-span-5 flex items-center gap-3 min-w-0">
-                                        <div className={cn(
-                                            'w-9 h-9 rounded-full bg-gradient-to-tr flex items-center justify-center text-xs font-medium text-white flex-shrink-0',
-                                            avatarColors[idx % avatarColors.length]
-                                        )}>
-                                            {member.userName.split(' ').map(n => n[0]).join('')}
-                                        </div>
+                                        {member.userAvatar ? (
+                                            <img
+                                                src={member.userAvatar}
+                                                alt={member.userName}
+                                                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                                            />
+                                        ) : (
+                                            <div className={cn(
+                                                'w-9 h-9 rounded-full bg-gradient-to-tr flex items-center justify-center text-xs font-medium text-white flex-shrink-0',
+                                                avatarColors[idx % avatarColors.length]
+                                            )}>
+                                                {member.userName.split(' ').map(n => n[0]).join('')}
+                                            </div>
+                                        )}
                                         <div className="min-w-0">
                                             <p className="text-sm font-medium text-white truncate">{member.userName}</p>
                                             <p className="text-xs text-slate-500 truncate flex items-center gap-1">
@@ -182,15 +214,6 @@ export default function TeamPage() {
 
                                     {/* Role */}
                                     <div className="col-span-3">
-                                        <RoleGuard allowedRoles={['ORGANIZATION_OWNER']}>
-                                            <select
-                                                defaultValue={member.roleInProject}
-                                                className="appearance-none px-3 py-1.5 rounded-lg bg-surface-secondary border border-white/[0.08] text-xs text-slate-300 cursor-pointer hover:bg-surface-tertiary transition-colors"
-                                            >
-                                                <option value="ORGANIZATION_OWNER">Owner</option>
-                                                <option value="ORGANIZATION_MEMBER">Member</option>
-                                            </select>
-                                        </RoleGuard>
                                         <span className={cn('inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-medium rounded-full border', role.className)}>
                                             <role.icon size={10} />
                                             {role.label}
@@ -202,11 +225,52 @@ export default function TeamPage() {
                                         {formatDistanceToNow(new Date(member.joinedAt), { addSuffix: true })}
                                     </div>
 
-                                    {/* Actions */}
+                                    {/* Actions menu */}
                                     <div className="col-span-1 flex justify-end">
-                                        <button className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white/5 hover:text-white transition-colors">
-                                            <MoreHorizontal size={14} />
-                                        </button>
+                                        <RoleGuard allowedRoles={['ORGANIZATION_OWNER']}>
+                                            <DropdownMenu.Root>
+                                                <DropdownMenu.Trigger asChild>
+                                                    <button className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:bg-white/5 hover:text-white transition-colors outline-none cursor-pointer">
+                                                        <MoreHorizontal size={14} />
+                                                    </button>
+                                                </DropdownMenu.Trigger>
+                                                <DropdownMenu.Portal>
+                                                    <DropdownMenu.Content
+                                                        sideOffset={5}
+                                                        align="end"
+                                                        className="z-[100] min-w-[200px] p-2 bg-surface-secondary border border-white/[0.08] rounded-xl shadow-xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-200"
+                                                    >
+                                                        {member.roleInProject !== 'ORGANIZATION_OWNER' ? (
+                                                            <DropdownMenu.Item
+                                                                onSelect={() => updateRoleMutation.mutate({ userId: member.userId, role: 'ORGANIZATION_OWNER' })}
+                                                                className="flex items-center gap-2.5 px-3 py-2.5 text-sm md:text-sm text-slate-300 rounded-lg hover:bg-indigo-500/10 hover:text-indigo-400 cursor-pointer outline-none transition-colors"
+                                                            >
+                                                                <ShieldAlert size={14} />
+                                                                Promote to Owner
+                                                            </DropdownMenu.Item>
+                                                        ) : (
+                                                            <DropdownMenu.Item
+                                                                onSelect={() => updateRoleMutation.mutate({ userId: member.userId, role: 'ORGANIZATION_MEMBER' })}
+                                                                className="flex items-center gap-2.5 px-3 py-2.5 text-sm md:text-sm text-slate-300 rounded-lg hover:bg-slate-500/10 hover:text-slate-400 cursor-pointer outline-none transition-colors"
+                                                            >
+                                                                <Users size={14} />
+                                                                Demote to Member
+                                                            </DropdownMenu.Item>
+                                                        )}
+
+                                                        <DropdownMenu.Separator className="h-px bg-white/[0.08] my-2" />
+                                                        
+                                                        <DropdownMenu.Item
+                                                            onSelect={() => removeMemberMutation.mutate(member.userId)}
+                                                            className="flex items-center gap-2.5 px-3 py-2.5 text-sm md:text-sm text-rose-500 rounded-lg hover:bg-rose-500/10 cursor-pointer outline-none transition-colors"
+                                                        >
+                                                            <UserMinus size={14} />
+                                                            Remove User
+                                                        </DropdownMenu.Item>
+                                                    </DropdownMenu.Content>
+                                                </DropdownMenu.Portal>
+                                            </DropdownMenu.Root>
+                                        </RoleGuard>
                                     </div>
                                 </div>
                             );

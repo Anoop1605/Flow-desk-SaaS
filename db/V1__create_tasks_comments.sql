@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     priority        VARCHAR(10)     NOT NULL DEFAULT 'MEDIUM',
     project_id      BIGINT          NOT NULL,
     assignee_id     BIGINT,
+    organization_id BIGINT          NOT NULL,
+    tenant_id       BIGINT          NOT NULL,
     due_date        DATE,
     created_at      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -25,6 +27,11 @@ CREATE TABLE IF NOT EXISTS tasks (
     -- FK to Member 2's projects table
     CONSTRAINT fk_tasks_project
         FOREIGN KEY (project_id) REFERENCES projects(id)
+        ON DELETE CASCADE,
+
+    -- FK to organizations table
+    CONSTRAINT fk_tasks_organization
+        FOREIGN KEY (organization_id) REFERENCES organizations(id)
         ON DELETE CASCADE,
 
     -- CHECK constraints for enum values
@@ -35,10 +42,12 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 
 -- Indexes for common query patterns
-CREATE INDEX IF NOT EXISTS idx_tasks_project_id   ON tasks(project_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_assignee_id  ON tasks(assignee_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_status        ON tasks(status);
-CREATE INDEX IF NOT EXISTS idx_tasks_due_date      ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_organization_id ON tasks(organization_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_tenant_id      ON tasks(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_project_id     ON tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_assignee_id    ON tasks(assignee_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status         ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date       ON tasks(due_date);
 
 
 -- ── Comments Table ──

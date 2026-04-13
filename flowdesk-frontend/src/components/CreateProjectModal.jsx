@@ -2,7 +2,6 @@ import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Palette, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { modalVariants } from '../lib/animations';
 
@@ -84,11 +83,13 @@ export default function CreateProjectModal({ open, onOpenChange, onSubmit }) {
                                     exit="exit"
                                     className="w-full max-w-lg bg-surface-secondary border border-white/[0.08] shadow-glow-lg rounded-3xl overflow-hidden focus:outline-none"
                                 >
+                                    <Dialog.Title className="hidden">Create New Project</Dialog.Title>
+                                    <Dialog.Description className="hidden">Create a new project for your organization</Dialog.Description>
                                     {/* Header */}
                                     <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04] bg-white/[0.01]">
-                                        <Dialog.Title className="text-lg font-display font-semibold text-white">
+                                        <h2 className="text-lg font-display font-semibold text-white">
                                             Create New Project
-                                        </Dialog.Title>
+                                        </h2>
                                         <Dialog.Close asChild>
                                             <button className="text-slate-500 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-1.5 rounded-full">
                                                 <X size={18} />

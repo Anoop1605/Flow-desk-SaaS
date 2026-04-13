@@ -1,13 +1,17 @@
 import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Select from '@radix-ui/react-select';
+import * as Popover from '@radix-ui/react-popover';
+import { format } from 'date-fns';
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar as CalendarIcon, Check, ChevronDown, Loader2 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { cn } from '../lib/utils';
-import { fadeUp, scaleIn } from '../lib/animations';
+import { scaleIn } from '../lib/animations';
 
 const taskSchema = z.object({
     title: z.string().min(3, "Title must be at least 3 characters").max(255),
@@ -41,7 +45,7 @@ export default function CreateTaskModal({ isOpen, onClose, onSubmit, defaultStat
             await onSubmit(data);
             // reset() and onClose() should be handled by the parent or here on success
             // In our case, App.jsx handles closing on success.
-        } catch (err) {
+        } catch {
             // Error handling is handled by the parent mutation/toast
         }
     };
@@ -69,10 +73,14 @@ export default function CreateTaskModal({ isOpen, onClose, onSubmit, defaultStat
                                     exit="exit"
                                     className="w-full max-w-lg bg-surface-secondary border border-white/[0.08] shadow-glow-lg rounded-3xl overflow-hidden focus:outline-none"
                                 >
+                                    <Dialog.Title className="hidden">Create New Task</Dialog.Title>
+                                    <Dialog.Description className="hidden">Create a new task for your project</Dialog.Description>
                                     <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.04] bg-white/[0.01]">
-                                        <Dialog.Title className="text-lg font-display font-semibold text-white">
-                                            Create New Task
-                                        </Dialog.Title>
+                                        <div>
+                                            <h2 className="text-lg font-display font-semibold text-white">
+                                                Create New Task
+                                            </h2>
+                                        </div>
                                         <Dialog.Close asChild>
                                             <button className="text-slate-500 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-1.5 rounded-full">
                                                 <X size={18} />
@@ -148,15 +156,46 @@ export default function CreateTaskModal({ isOpen, onClose, onSubmit, defaultStat
                                                     />
                                                 </div>
 
-                                                {/* Due Date (Native Date Picker for Phase 1 stub) */}
+                                                {/* Due Date (Using Radix Popover and DayPicker) */}
                                                 <div>
                                                     <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Due Date</label>
                                                     <div className="relative">
-                                                        <CalendarIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                                        <input
-                                                            type="date"
-                                                            {...register('dueDate')}
-                                                            className="w-full bg-surface-canvas border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all custom-calendar-icon"
+                                                        <Controller
+                                                            control={control}
+                                                            name="dueDate"
+                                                            render={({ field }) => (
+                                                                <Popover.Root>
+                                                                    <Popover.Trigger asChild>
+                                                                        <button
+                                                                            type="button"
+                                                                            className={cn(
+                                                                                "w-full text-left bg-surface-canvas border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all",
+                                                                                !field.value ? "text-slate-500" : "text-white"
+                                                                            )}
+                                                                        >
+                                                                            <CalendarIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                                                            {field.value ? format(new Date(field.value), 'PPP') : "Select due date"}
+                                                                        </button>
+                                                                    </Popover.Trigger>
+                                                                    <Popover.Portal>
+                                                                        <Popover.Content className="z-[100] w-auto p-3 bg-surface-secondary border border-white/10 rounded-xl shadow-xl backdrop-blur-xl" sideOffset={5}>
+                                                                            <DayPicker
+                                                                                mode="single"
+                                                                                selected={field.value ? new Date(field.value) : undefined}
+                                                                                onSelect={(date) => field.onChange(date ? format(date, 'yyyy-MM-dd') : '')}
+                                                                                className="rdp-dark text-white"
+                                                                                classNames={{
+                                                                                    day: "w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center cursor-pointer transition-colors text-sm",
+                                                                                    day_selected: "bg-indigo-600 text-white font-medium hover:bg-indigo-500",
+                                                                                    caption: "flex items-center justify-between pb-2 text-sm font-semibold",
+                                                                                    head_cell: "text-slate-400 uppercase text-[10px] w-8 text-center pb-2",
+                                                                                    nav_button: "w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center cursor-pointer transition-colors",
+                                                                                }}
+                                                                            />
+                                                                        </Popover.Content>
+                                                                    </Popover.Portal>
+                                                                </Popover.Root>
+                                                            )}
                                                         />
                                                     </div>
                                                 </div>
